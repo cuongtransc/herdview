@@ -30,6 +30,12 @@ herdr_path = "/home/cuongnb/.local/bin/herdr"
 poll_seconds = 2            # optional, default 2
 ```
 
+That file is written for you on a first run: with no config at all, Herdview puts
+one there with a single `local` host — `herdr_path` looked for in the usual
+install locations, PATH last — and starts watching this Mac. It never writes
+over a config that is already there; a file that exists and does not parse is
+reported in the window instead.
+
 The app was called HerdPet and read `~/.config/herdpet/config.toml`. Nothing
 migrates that file for you: move it yourself with
 `mv ~/.config/herdpet ~/.config/herdview`. A config from back then may still

@@ -19,7 +19,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         var config = HerdviewConfig(hosts: [])
         do {
-            config = try ConfigLoader.load()
+            let load = try ConfigLoader.loadOrCreate()
+            config = load.config
+            // A first run is not news to put in the window; it is news for the
+            // log, where it explains where this Mac came from.
+            switch load.origin {
+            case .existing:
+                break
+            case .created:
+                NSLog("herdview: wrote a first-run config at %@", ConfigLoader.defaultPath)
+            case .inMemory:
+                NSLog("herdview: could not write %@; watching this Mac for this launch only",
+                      ConfigLoader.defaultPath)
+            }
         } catch {
             store.configError = "\(ConfigLoader.defaultPath): \(error)"
         }
