@@ -1,7 +1,7 @@
 // Draws Herdview's app icon and packs it into scripts/AppIcon.icns.
 //
 // The mark itself is not here: it is `Sources/App/HerdMark.swift`, the same file
-// the menu bar item draws from, compiled into this tool by `make icon`. Four
+// the menu bar item draws from, compiled into this tool by `mise run icon`. Four
 // agents on a dark tile, one of them lit because it is asking for a person —
 // which is the one thing the app is for.
 //
@@ -9,8 +9,8 @@
 // `AgentIcons.swift` embeds its SVGs: this project carries no resource bundle
 // and no asset pipeline.
 //
-//   make icon                    # the default accent
-//   make icon COLOR=5C43DC       # any other one (no `#`: make reads it as a comment)
+//   mise run icon                 # the default accent
+//   mise run icon --color 5C43DC  # any other one (no `#`: the shell reads it as a comment)
 //
 // COLOR is the accent — the colour of the one agent that is asking. The tile
 // stays dark whatever it is set to, so the mark cannot come out as a flat

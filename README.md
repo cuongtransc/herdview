@@ -103,12 +103,17 @@ reached through `ssh -N -L ~/.herdview/sock/<host>-<session>.sock:<remote socket
 ## Build and run
 
 ```bash
-make          # release .app → build/Herdview.app
-make run      # build and open
-make test     # swift test
-make clean
+mise trust                     # once, so mise will load mise.toml
+mise run                       # release .app → build/Herdview.app
+mise run run                   # build and open
+mise run test                  # swift test
+mise run clean
+mise run icon --color 5C43DC   # redraw scripts/AppIcon.icns (the default accent if --color is left out)
 ```
 
-Or without Make: `swift test && ./scripts/build-app.sh && open build/Herdview.app`.
+`CONFIG=debug mise run app` builds unoptimised. `mise run build` is the plain
+compile check, without the .app around it.
+
+Or without mise: `swift test && ./scripts/build-app.sh && open build/Herdview.app`.
 
 Logs go to the unified log: `log stream --predicate 'process == "herdview"'`.

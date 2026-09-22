@@ -1,0 +1,39 @@
+# Herdview — tasks. `mise run` builds the .app; `mise run <task>` for the rest.
+# Run `mise trust` once so mise will load this file.
+
+[tasks.default]
+description = "Build the release .app (same as `mise run app`)"
+depends = ["app"]
+
+[tasks.build]
+description = "Compile the package; CONFIG=debug for an unoptimised build"
+run = "swift build -c ${CONFIG:-release}"
+
+[tasks.app]
+description = "Build build/Herdview.app and ad-hoc sign it; CONFIG=debug to match `build`"
+run = "./scripts/build-app.sh ${CONFIG:-release}"
+
+[tasks.run]
+description = "Build the .app and open it"
+depends = ["app"]
+run = "open build/Herdview.app"
+
+[tasks.test]
+description = "Run the test suite"
+run = "swift test"
+
+[tasks.icon]
+description = "Redraw scripts/AppIcon.icns; the default accent unless --color is given"
+usage = 'flag "--color <hex>" help="Accent as RRGGBB (default E07B00); quote it if you pass the #"'
+run = """
+mkdir -p build
+swiftc -parse-as-library -O scripts/make-icon.swift Sources/App/HerdMark.swift -o build/make-icon
+./build/make-icon . ${usage_color:+--color "$usage_color"}
+"""
+
+[tasks.clean]
+description = "Remove the build products"
+run = """
+swift package clean
+rm -rf build/Herdview.app
+"""
