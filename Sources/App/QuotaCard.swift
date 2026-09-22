@@ -2,7 +2,9 @@ import SwiftUI
 import HerdviewCore
 
 /// How much of each Provider's Quota is used, above the Hosts. One row per
-/// Provider, always, so a missing row can never be read as "no limit".
+/// Provider the config watches, always, so a missing row can never be read as
+/// "no limit" — the only row that is absent is one `hidden_providers` asked not
+/// to show, and that is the user saying they have no such account to spend.
 ///
 /// Collapsed, the card keeps every Provider on one line with its shortest
 /// Window only, so it still answers "can I keep going" in a fraction of the
@@ -73,7 +75,7 @@ struct QuotaCard: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(QuotaProvider.allCases.enumerated()), id: \.element) { index, provider in
+            ForEach(Array(store.providers.enumerated()), id: \.element) { index, provider in
                 if index > 0 {
                     Rectangle()
                         .fill(Color.primary.opacity(0.08))
@@ -97,7 +99,7 @@ private struct QuotaSummary: View {
 
     var body: some View {
         FlowLayout(spacing: 16, lineSpacing: 6) {
-            ForEach(QuotaProvider.allCases, id: \.self) { provider in
+            ForEach(store.providers, id: \.self) { provider in
                 item(provider, store.entry(for: provider))
             }
         }

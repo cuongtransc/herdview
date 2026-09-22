@@ -19,6 +19,11 @@ never from agent hooks. See `docs/adr/` for why.
 `~/.config/herdview/config.toml`:
 
 ```toml
+# Optional: leave a Provider's row out of the Quota card, for one you have no
+# account for. Any of: claude, codex, opencodeGo, grok. Keep it above the first
+# [[hosts]] — below one, TOML reads it as a key of that host.
+hidden_providers = ["codex"]
+
 [[hosts]]
 name = "local"
 herdr_path = "/opt/homebrew/bin/herdr"
@@ -67,9 +72,12 @@ rather than leaving a stack behind — and no banner is shown while Herdview is 
 app in front, since the blinking row is already saying it. There is no switch for
 this in the app; the switch is System Settings › Notifications › Herdview.
 
-Above the hosts, a Quota card shows how much of each plan is used: Claude, Codex,
-OpenCode Go and Grok, one row each. Every Window — `5h`, `week`, `month`, or a
-per-model week like `week · Fable` — shows the percent used and how long until it
+Above the hosts, a Quota card shows how much of each plan is used: one row per
+Provider, minus anything in `hidden_providers` — a Provider you have no account
+for is a row that can only ever say "not signed in". A hidden Provider is not
+fetched either, so its credential file is not even read. Every Window — `5h`,
+`week`, `month`, or a per-model week like `week · Fable` — shows the percent used
+and how long until it
 resets. A yellow tick on the bar marks how much of the Window's time has passed:
 the bar is green while it stays behind the tick and turns orange once it runs past
 it, being spent faster than the clock, or reaches 90%. A `month`, whose length

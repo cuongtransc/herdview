@@ -17,6 +17,24 @@ public enum QuotaProvider: String, CaseIterable, Sendable {
         }
     }
 
+    /// The Provider a config names, for `hidden_providers`. Case and punctuation
+    /// are ignored, so `codex`, `opencodeGo`, `opencode-go` and `OpenCode Go` all
+    /// find their Provider — a hand-written config should not have to know that
+    /// `opencodeGo` is spelled without a space anywhere else.
+    public init?(name: String) {
+        let wanted = QuotaProvider.normalized(name)
+        guard !wanted.isEmpty,
+              let match = QuotaProvider.allCases.first(where: { QuotaProvider.normalized($0.rawValue) == wanted })
+        else { return nil }
+        self = match
+    }
+
+    /// Every name a config could use reduced to the same thing: lower case, with
+    /// nothing but letters and digits left.
+    static func normalized(_ name: String) -> String {
+        name.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
     /// What to run to bring an expired sign-in back. Herdview never refreshes a
     /// token itself (ADR 0005); the CLI does it the next time it runs.
     public var signInCommand: String {

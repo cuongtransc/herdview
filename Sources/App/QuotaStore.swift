@@ -6,8 +6,12 @@ import HerdviewCore
 /// the card observes it.
 @MainActor
 final class QuotaStore: ObservableObject {
-    @Published private(set) var entries: [QuotaProvider: QuotaEntry] =
-        Dictionary(uniqueKeysWithValues: QuotaProvider.allCases.map { ($0, .loading) })
+    /// The Providers to show and fetch, in card order. Fixed at construction
+    /// from the config's `hidden_providers`, so the monitor reads the same list
+    /// the card draws and neither can drift from the other.
+    let providers: [QuotaProvider]
+
+    @Published private(set) var entries: [QuotaProvider: QuotaEntry]
 
     /// Providers with a fetch in flight, so the card can show that a refresh
     /// is under way.
@@ -21,8 +25,10 @@ final class QuotaStore: ObservableObject {
 
     private let preferences: WindowPreferences
 
-    init(preferences: WindowPreferences = WindowPreferences()) {
+    init(providers: [QuotaProvider], preferences: WindowPreferences = WindowPreferences()) {
+        self.providers = providers
         self.preferences = preferences
+        entries = Dictionary(uniqueKeysWithValues: providers.map { ($0, .loading) })
         isCollapsed = preferences.isQuotaCollapsed
     }
 

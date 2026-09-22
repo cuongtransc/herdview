@@ -4,7 +4,6 @@ import HerdviewCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = AgentStore()
-    private let quotaStore = QuotaStore()
     private var monitor: Monitor?
     private var quotaMonitor: QuotaMonitor?
     private var statusBar: StatusBarController?
@@ -35,6 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             store.configError = "\(ConfigLoader.defaultPath): \(error)"
         }
+
+        // Built here rather than as a property, because which Providers it
+        // watches is the config's decision and the config is only just read.
+        // The monitor holds it for as long as the app runs.
+        let quotaStore = QuotaStore(providers: config.watchedProviders)
 
         let window = MainWindowController(store: store, quotaStore: quotaStore, keepOnTopItem: menuItems?.keepOnTop)
         mainWindow = window

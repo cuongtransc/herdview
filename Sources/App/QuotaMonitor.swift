@@ -115,7 +115,9 @@ final class QuotaMonitor {
     private func refresh(_ trigger: QuotaSchedule.Trigger) {
         guard loop != nil, isWindowVisible() else { return }
         let now = Date()
-        for provider in QuotaProvider.allCases where fetches[provider] == nil {
+        // The store's list, not `allCases`: a hidden Provider is one nobody has
+        // an account for, so there is no credential to read and nothing to ask.
+        for provider in store.providers where fetches[provider] == nil {
             guard QuotaSchedule.isDue(trigger, lastStarted: lastStarted[provider],
                                       rateLimitedUntil: rateLimitedUntil[provider], now: now) else { continue }
             lastStarted[provider] = now

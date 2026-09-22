@@ -19,9 +19,21 @@ public struct HostConfig: Equatable, Sendable {
 
 public struct HerdviewConfig: Equatable, Sendable {
     public var hosts: [HostConfig]
+    /// Providers the Quota card leaves out, from `hidden_providers`. A Provider
+    /// with no account on this Mac is a row that can only ever say "not signed
+    /// in", which in a card of numbers is noise.
+    public var hiddenProviders: Set<QuotaProvider>
 
-    public init(hosts: [HostConfig]) {
+    public init(hosts: [HostConfig], hiddenProviders: Set<QuotaProvider> = []) {
         self.hosts = hosts
+        self.hiddenProviders = hiddenProviders
+    }
+
+    /// What the Quota card shows and what is fetched for it: every Provider in
+    /// `QuotaProvider.allCases` order except the hidden ones, so hiding one
+    /// never moves the rows that are left.
+    public var watchedProviders: [QuotaProvider] {
+        QuotaProvider.allCases.filter { !hiddenProviders.contains($0) }
     }
 }
 
@@ -29,6 +41,7 @@ public enum ConfigError: Error, Equatable {
     case parse(String)
     case missingField(host: Int, field: String)
     case invalidType(String)
+    case unknownProvider(String)
 }
 
 public enum ConfigLoader {
@@ -153,6 +166,22 @@ public enum ConfigLoader {
         // `pet`, `[clips]` and `[messages]` are no longer read. They parse as
         // ordinary TOML and are ignored, so a config written for the pet still
         // loads; the README says they are gone.
+        var hidden: Set<QuotaProvider> = []
+        if let raw = doc.root["hidden_providers"] {
+            guard case .array(let items) = raw else {
+                throw ConfigError.invalidType("hidden_providers must be an array of Provider names")
+            }
+            for (index, item) in items.enumerated() {
+                guard let name = item.stringValue else {
+                    throw ConfigError.invalidType("hidden_providers[\(index)] must be a string")
+                }
+                guard let provider = QuotaProvider(name: name) else {
+                    throw ConfigError.unknownProvider(name)
+                }
+                hidden.insert(provider)
+            }
+        }
+
         var hosts: [HostConfig] = []
         for (index, entry) in (doc.arrays["hosts"] ?? []).enumerated() {
             guard let name = entry["name"]?.stringValue else { throw ConfigError.missingField(host: index, field: "name") }
@@ -166,6 +195,6 @@ public enum ConfigLoader {
             hosts.append(HostConfig(name: name, ssh: ssh, herdrPath: herdrPath, pollSeconds: poll))
         }
 
-        return HerdviewConfig(hosts: hosts)
+        return HerdviewConfig(hosts: hosts, hiddenProviders: hidden)
     }
 }

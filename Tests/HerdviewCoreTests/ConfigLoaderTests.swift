@@ -129,6 +129,57 @@ final class ConfigLoaderTests: XCTestCase {
                                    pollSeconds: ConfigLoader.defaultPollSeconds)])
     }
 
+    // MARK: - Hidden Providers
+
+    func testHiddenProvidersLeavesTheRowsThatAreLeftWhereTheyWere() throws {
+        let config = try ConfigLoader.parse("""
+        hidden_providers = ["codex"]
+
+        [[hosts]]
+        name = "local"
+        herdr_path = "/opt/homebrew/bin/herdr"
+        """)
+        XCTAssertEqual(config.hiddenProviders, [.codex])
+        XCTAssertEqual(config.watchedProviders, [.claude, .opencodeGo, .grok])
+    }
+
+    func testWithNothingHiddenEveryProviderIsWatched() throws {
+        let config = try ConfigLoader.parse("[[hosts]]\nname = \"local\"\nherdr_path = \"/x\"\n")
+        XCTAssertTrue(config.hiddenProviders.isEmpty)
+        XCTAssertEqual(config.watchedProviders, QuotaProvider.allCases)
+    }
+
+    func testHiddenProvidersAcceptsAnySpellingOfAName() throws {
+        let config = try ConfigLoader.parse("""
+        hidden_providers = ["OpenCode Go", "opencode_go", "opencode-go"]
+        """)
+        XCTAssertEqual(config.hiddenProviders, [.opencodeGo])
+    }
+
+    func testHidingEveryProviderIsAllowedAndShowsNothing() throws {
+        let config = try ConfigLoader.parse("""
+        hidden_providers = ["claude", "codex", "opencodeGo", "grok"]
+        """)
+        XCTAssertEqual(config.watchedProviders, [])
+    }
+
+    func testAnUnknownProviderNameThrows() {
+        XCTAssertThrowsError(try ConfigLoader.parse("hidden_providers = [\"gpt5\"]\n")) { error in
+            XCTAssertEqual(error as? ConfigError, .unknownProvider("gpt5"))
+        }
+    }
+
+    func testHiddenProvidersMustBeAnArrayOfStrings() {
+        XCTAssertThrowsError(try ConfigLoader.parse("hidden_providers = \"codex\"\n")) { error in
+            guard case ConfigError.invalidType? = error as? ConfigError else {
+                return XCTFail("expected invalidType, got \(error)")
+            }
+        }
+        XCTAssertThrowsError(try ConfigLoader.parse("hidden_providers = [3]\n")) { error in
+            XCTAssertEqual(error as? ConfigError, .invalidType("hidden_providers[0] must be a string"))
+        }
+    }
+
     // MARK: - Finding herdr
 
     func testFindHerdrChecksTheUsualPlacesBeforePath() {
