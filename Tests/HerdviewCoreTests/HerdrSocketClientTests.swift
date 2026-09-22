@@ -19,10 +19,12 @@ final class FakeSocketServer {
             $0.withMemoryRebound(to: CChar.self, capacity: 104) { _ = strncpy($0, socketPath, 103) }
         }
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
-        let bound = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, len) } }
+        // `fd` is read into a local first: naming the property inside the
+        // closure would capture `self` before `thread` is initialised.
+        let listenFD = fd
+        let bound = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(listenFD, $0, len) } }
         precondition(bound == 0, "bind failed: \(String(cString: strerror(errno)))")
         precondition(listen(fd, 1) == 0)
-        let listenFD = fd
         thread = Thread {
             let client = accept(listenFD, nil, nil)
             guard client >= 0 else { return }
