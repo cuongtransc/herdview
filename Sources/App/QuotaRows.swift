@@ -1,79 +1,18 @@
 import SwiftUI
 import HerdviewCore
 
-/// How much of each Provider's Quota is used, above the Hosts. One row per
-/// Provider the config watches, always, so a missing row can never be read as
-/// "no limit" — the only row that is absent is one `hidden_providers` asked not
-/// to show, and that is the user saying they have no such account to spend.
+/// Every Window of every Provider, one row each: the panel the title bar's
+/// strip expands into.
 ///
-/// Collapsed, the card keeps every Provider on one line with its shortest
-/// Window only, so it still answers "can I keep going" in a fraction of the
-/// height.
-struct QuotaCard: View {
+/// One row per Provider the config watches, always, so a missing row can never
+/// be read as "no limit" — the only row that is absent is one
+/// `hidden_providers` asked not to show, and that is the user saying they have
+/// no such account to spend.
+struct QuotaRows: View {
     @ObservedObject var store: QuotaStore
     let now: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            header
-            Group {
-                if store.isExpanded {
-                    rows
-                } else {
-                    QuotaSummary(store: store, now: now)
-                        .padding(.horizontal, Metrics.textInset)
-                        .padding(.vertical, 6)
-                }
-            }
-            .cardSurface()
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Button {
-                store.isExpanded.toggle()
-            } label: {
-                HStack(spacing: 4) {
-                    Text("Quota")
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .rotationEffect(.degrees(store.isExpanded ? 90 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(store.isExpanded ? "Show only the shortest Window" : "Show every Window")
-            Spacer(minLength: 8)
-            refreshButton
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, Metrics.textInset)
-    }
-
-    /// A spinner stands in for the button while any Provider is being fetched:
-    /// pressing again then would do nothing, and the spinner says so.
-    @ViewBuilder private var refreshButton: some View {
-        if store.fetching.isEmpty {
-            Button {
-                store.refreshNow()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 14, height: 14)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Refresh Quota now")
-        } else {
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 14, height: 14)
-        }
-    }
-
-    private var rows: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(store.providers.enumerated()), id: \.element) { index, provider in
                 if index > 0 {
@@ -90,48 +29,7 @@ struct QuotaCard: View {
     }
 }
 
-/// The collapsed card: each Provider's icon beside its shortest Window. A
-/// Provider with nothing to show keeps a faded icon, so it is still there to
-/// be missed rather than silently gone.
-private struct QuotaSummary: View {
-    @ObservedObject var store: QuotaStore
-    let now: Date
-
-    var body: some View {
-        FlowLayout(spacing: 16, lineSpacing: 6) {
-            ForEach(store.providers, id: \.self) { provider in
-                item(provider, store.entry(for: provider))
-            }
-        }
-    }
-
-    private func item(_ provider: QuotaProvider, _ entry: QuotaEntry) -> some View {
-        let window = entry.lastReport.flatMap { QuotaFormat.summaryWindow(of: $0.windows) }
-        let fresh: Bool
-        if case .ok = entry { fresh = true } else { fresh = false }
-        return HStack(spacing: 6) {
-            ProviderIcon(provider: provider, side: 20)
-                .opacity(window == nil ? 0.45 : 1)
-            if let window {
-                WindowGauge(window: window, now: now)
-                    .opacity(fresh ? 1 : 0.45)
-            }
-        }
-        .help(summaryHelp(provider, entry))
-        .fixedSize()
-    }
-
-    private func summaryHelp(_ provider: QuotaProvider, _ entry: QuotaEntry) -> String {
-        switch entry {
-        case .loading: return provider.displayName
-        case .notSignedIn: return "\(provider.displayName): not signed in"
-        case .ok: return provider.displayName
-        case .problem(let problem, _): return "\(provider.displayName): \(problem.message(for: provider))"
-        }
-    }
-}
-
-private struct QuotaRow: View {
+struct QuotaRow: View {
     static let textLeading: CGFloat = iconSide + iconGap
     private static let iconSide: CGFloat = 26
     private static let iconGap: CGFloat = 10
@@ -210,7 +108,7 @@ private struct QuotaRow: View {
 
 /// A Provider's agent icon on its rounded tile, at whatever size the place
 /// using it needs.
-private struct ProviderIcon: View {
+struct ProviderIcon: View {
     let provider: QuotaProvider
     let side: CGFloat
 
@@ -241,7 +139,7 @@ private struct ProviderIcon: View {
 /// everywhere in this app, because orange text does not reach a readable
 /// contrast against a light window at this size; a Window near its limit says
 /// so with a heavier weight instead.
-private struct WindowGauge: View {
+struct WindowGauge: View {
     private static let barWidth: CGFloat = 44
 
     let window: QuotaWindow
@@ -297,7 +195,7 @@ private struct WindowGauge: View {
 /// Lays its children out left to right and wraps to a new line when the next
 /// one does not fit, so a row's Windows fold under each other as the window
 /// narrows instead of being cut off.
-private struct FlowLayout: Layout {
+struct FlowLayout: Layout {
     let spacing: CGFloat
     let lineSpacing: CGFloat
 

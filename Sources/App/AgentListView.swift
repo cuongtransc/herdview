@@ -3,18 +3,20 @@ import SwiftUI
 import HerdviewCore
 
 /// What every host is running: one card per host, most attention-worthy agent
-/// first. This is the window's whole content, and it is drawn on the window's
-/// own glass — nothing here paints a background of its own.
+/// first. This is everything below the Quota's row, and it is drawn on the
+/// window's own glass — nothing here paints a background of its own.
 ///
 /// There is no summary of the herd. Every card carries its host's count, what
 /// an agent is doing is on its own row, and a notification reaches whoever is
 /// not looking at either; a bar restating all of it only cost the window its
 /// top inch.
 ///
-/// Nothing here reserves room for the title bar either. The window hands the
-/// list a safe area that already excludes it, and the window buttons sit inside
-/// that area — so a spacer of the title bar's height on top of it counts the
-/// same strip twice and pushes the first host most of an inch down the window.
+/// The window's top row is the Quota's, not this list's: `QuotaTitleBar` draws
+/// the title-bar strip there and, when expanded, the panel below it. The strip
+/// has to sit in the title bar's own row beside the window buttons, so this view
+/// reads the title bar's height from the top safe-area inset and then ignores
+/// that inset — the row it draws is exactly the height of the area it gave up,
+/// so the first host still starts where it always did.
 ///
 /// The tick lives here, and moves the elapsed times only: it runs at half a
 /// second so a row never shows a stale second. The blink is not on this clock
@@ -24,94 +26,119 @@ struct AgentListView: View {
     /// behind the real one.
     private static let tick: TimeInterval = 0.5
 
+    /// A window in full screen reports no top inset, and the strip still needs a
+    /// row to sit in: a title bar's height is a better guess than nothing.
+    private static let titleBarFallback: CGFloat = 28
+
     @ObservedObject var store: AgentStore
     @ObservedObject var quotaStore: QuotaStore
     @ObservedObject var filter: FilterState
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: Self.tick)) { context in
-            // Run the filter once for the whole body and read every answer off
-            // the one result — the segments, the banner, the hosts, the empty
-            // state and the footer all have to agree, and a second pass could
-            // only ever disagree with the first.
-            let result = filter.filter.apply(to: store.agents)
-            let isFiltering = filter.filter.isActive
-            // Grouping once here rather than filtering per host keeps the work
-            // proportional to the herd, not to the herd times the hosts.
-            let visibleByHost = isFiltering
-                ? Dictionary(grouping: result.visible, by: \.host)
-                : [:]
-            // A host with nothing left to show is not shown at all — a card
-            // that says "No agents here" while a filter is on would read as a
-            // fact about the host rather than about the filter. Hosts keep the
-            // store's order, and the agents within them keep theirs.
-            let hosts = isFiltering
-                ? store.hostOrder.filter { !(visibleByHost[$0] ?? []).isEmpty }
-                : store.hostOrder
-            ScrollView {
-                // Host groups are separated by air rather than by a rule:
-                // the card edge already says where one host ends.
-                LazyVStack(alignment: .leading, spacing: Metrics.groupGap) {
-                    FilterBar(filter: filter, counts: result.scopeCounts)
-                    if result.hiddenAskingForAPerson > 0 {
-                        HiddenAttentionBanner(count: result.hiddenAskingForAPerson) {
-                            filter.clear()
+            // The title bar's height is the top safe-area inset, read here before
+            // the inset is ignored below: the row of exactly that height is what
+            // the strip sits in. Taking it from the window's metrics once at
+            // construction would freeze a number that changes with the window's
+            // shape; measuring it here keeps the row and the strip in step.
+            GeometryReader { proxy in
+                let titleBarHeight = max(proxy.safeAreaInsets.top, Self.titleBarFallback)
+                // Run the filter once for the whole body and read every answer off
+                // the one result — the segments, the banner, the hosts, the empty
+                // state and the footer all have to agree, and a second pass could
+                // only ever disagree with the first.
+                let result = filter.filter.apply(to: store.agents)
+                let isFiltering = filter.filter.isActive
+                // Grouping once here rather than filtering per host keeps the work
+                // proportional to the herd, not to the herd times the hosts.
+                let visibleByHost = isFiltering
+                    ? Dictionary(grouping: result.visible, by: \.host)
+                    : [:]
+                // A host with nothing left to show is not shown at all — a card
+                // that says "No agents here" while a filter is on would read as a
+                // fact about the host rather than about the filter. Hosts keep the
+                // store's order, and the agents within them keep theirs.
+                let hosts = isFiltering
+                    ? store.hostOrder.filter { !(visibleByHost[$0] ?? []).isEmpty }
+                    : store.hostOrder
+                // The Quota's row and the list are one column. The panel the
+                // Quota expands into sits between them, outside the `ScrollView`,
+                // so expanding pushes the filter and the herd down rather than
+                // covering them.
+                VStack(spacing: 0) {
+                    QuotaTitleBar(store: quotaStore,
+                                  now: context.date,
+                                  titleBarHeight: titleBarHeight)
+                    ScrollView {
+                        // Host groups are separated by air rather than by a rule:
+                        // the card edge already says where one host ends.
+                        LazyVStack(alignment: .leading, spacing: Metrics.groupGap) {
+                            FilterBar(filter: filter, counts: result.scopeCounts)
+                            if result.hiddenAskingForAPerson > 0 {
+                                HiddenAttentionBanner(count: result.hiddenAskingForAPerson) {
+                                    filter.clear()
+                                }
+                            }
+                            if let error = store.configError {
+                                Notice(symbol: "exclamationmark.triangle.fill", text: error, tint: .red)
+                                    .padding(.horizontal, Metrics.textInset)
+                                    .cardSurface()
+                            }
+                            if store.hostOrder.isEmpty {
+                                Notice(symbol: "server.rack",
+                                       text: "No hosts yet. Add one in \(ConfigLoader.defaultPath)")
+                                    .padding(.horizontal, Metrics.textInset)
+                                    .cardSurface()
+                            }
+                            // Only when there were hosts to filter: with none, the
+                            // notice above already says why the list is empty, and
+                            // "No agents match" would blame the filter for it.
+                            if isFiltering && result.visible.isEmpty && !store.hostOrder.isEmpty {
+                                Notice(symbol: "line.3.horizontal.decrease.circle",
+                                       text: "No agents match")
+                                    .padding(.horizontal, Metrics.textInset)
+                                    .cardSurface()
+                            } else {
+                                ForEach(hosts, id: \.self) { host in
+                                    HostGroup(host: host,
+                                              agents: isFiltering ? (visibleByHost[host] ?? [])
+                                                                  : store.agents(forHost: host),
+                                              unreachable: store.unreachableHosts.contains(host),
+                                              now: context.date)
+                                }
+                            }
+                            if isFiltering && result.hiddenCount > 0 {
+                                FilterFooter(hiddenCount: result.hiddenCount,
+                                             hiddenHosts: result.hiddenHosts) {
+                                    filter.clear()
+                                }
+                            }
                         }
+                        .padding(.horizontal, Metrics.gutter)
+                        // Asymmetric on purpose. The title bar row above already
+                        // holds the list clear of the window buttons, so anything
+                        // more on top is a gap this window cannot afford. The
+                        // bottom has nothing above it and keeps the whole margin.
+                        .padding(.top, 2)
+                        .padding(.bottom, Metrics.gutter)
                     }
-                    QuotaCard(store: quotaStore, now: context.date)
-                    if let error = store.configError {
-                        Notice(symbol: "exclamationmark.triangle.fill", text: error, tint: .red)
-                            .padding(.horizontal, Metrics.textInset)
-                            .cardSurface()
-                    }
-                    if store.hostOrder.isEmpty {
-                        Notice(symbol: "server.rack",
-                               text: "No hosts yet. Add one in \(ConfigLoader.defaultPath)")
-                            .padding(.horizontal, Metrics.textInset)
-                            .cardSurface()
-                    }
-                    // Only when there were hosts to filter: with none, the
-                    // notice above already says why the list is empty, and
-                    // "No agents match" would blame the filter for it.
-                    if isFiltering && result.visible.isEmpty && !store.hostOrder.isEmpty {
-                        Notice(symbol: "line.3.horizontal.decrease.circle",
-                               text: "No agents match")
-                            .padding(.horizontal, Metrics.textInset)
-                            .cardSurface()
-                    } else {
-                        ForEach(hosts, id: \.self) { host in
-                            HostGroup(host: host,
-                                      agents: isFiltering ? (visibleByHost[host] ?? [])
-                                                          : store.agents(forHost: host),
-                                      unreachable: store.unreachableHosts.contains(host),
-                                      now: context.date)
-                        }
-                    }
-                    if isFiltering && result.hiddenCount > 0 {
-                        FilterFooter(hiddenCount: result.hiddenCount,
-                                     hiddenHosts: result.hiddenHosts) {
-                            filter.clear()
-                        }
-                    }
+                    // No background here on purpose. The window's own backdrop is
+                    // an `NSVisualEffectView` blurring whatever is behind the
+                    // window, and painting a colour over it would be painting the
+                    // blur out again. That view, not this one, is what keeps light
+                    // text off a light sheet in dark mode.
+                    //
+                    // The popover was a fixed 360 wide; a window is whatever the
+                    // user drags it to, so the list fills the width and the rows
+                    // spread.
                 }
-                .padding(.horizontal, Metrics.gutter)
-                // Asymmetric on purpose. The window already holds the list clear
-                // of the title bar through the safe area, and the window buttons
-                // live inside that; anything more on top is a gap this window
-                // cannot afford. The bottom has nothing above it and keeps the
-                // whole margin.
-                .padding(.top, 2)
-                .padding(.bottom, Metrics.gutter)
+                .frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
+                // The strip has to sit in the title bar's own row, so the column
+                // is drawn into the safe area rather than below it. The list keeps
+                // the space it always had, because the row it gained is exactly
+                // the height of the inset that was given up.
+                .ignoresSafeArea(.container, edges: .top)
             }
-            // No background here on purpose. The window's own backdrop is an
-            // `NSVisualEffectView` blurring whatever is behind the window, and
-            // painting a colour over it would be painting the blur out again.
-            // That view, not this one, is what keeps light text off a light
-            // sheet in dark mode.
-            //
-            // The popover was a fixed 360 wide; a window is whatever the user
-            // drags it to, so the list fills the width and the rows spread.
-            .frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
         }
     }
 }

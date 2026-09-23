@@ -7,16 +7,17 @@ import SwiftUI
 /// the menu bar item carry on — so `isReleasedWhenClosed` is off and
 /// `AppDelegate` refuses to terminate with it.
 ///
-/// The title bar is transparent and empty, and the list runs the whole height
-/// of the window underneath it: the herd summary is the first thing in that
-/// list, laid out to sit in the title bar's row beside the window buttons.
+/// The title bar is transparent, and the list runs the whole height of the
+/// window underneath it. The title bar's own row is the Quota's: the list reads
+/// the top safe-area inset, ignores it, and puts `QuotaTitleBar` in that row
+/// beside the window buttons — so the strip is clickable there while the empty
+/// part of the row still drags the window.
 ///
 /// It was an `NSToolbar` first, for the Liquid Glass a toolbar is given for
 /// free. That was the wrong trade once the window itself became glass: from
 /// macOS 26 every toolbar item is wrapped in a glass capsule of its own, and
-/// two dark blisters floating over the top of the window read as buttons —
-/// which these are not, since there is nothing here to click. A plain strip on
-/// the window's own glass says the same thing and stays quiet.
+/// the strip read as a row of separate buttons rather than as one thing. A
+/// plain strip on the window's own glass says the same thing and stays quiet.
 ///
 /// It can also be kept on top: at `.floating` the window stays above other
 /// apps' windows, so the herd is readable while you work in an editor. That is
@@ -53,15 +54,16 @@ final class MainWindowController: NSObject {
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 480),
             // `.fullSizeContentView` hands the title bar's own strip of the
-            // window to the content view, which is what lets the summary sit in
-            // the same row as the window buttons instead of below them.
+            // window to the content view, which is what lets the Quota strip sit
+            // in the same row as the window buttons instead of below them.
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Herdview"
-        // The summary occupies the titlebar row, so the name would collide with
-        // it. The menu bar item and the Dock already say whose window this is.
+        // The Quota strip occupies the titlebar row, so the name would collide
+        // with it. The menu bar item and the Dock already say whose window this
+        // is.
         window.titleVisibility = .hidden
         window.contentMinSize = NSSize(width: 360, height: 240)
         window.isReleasedWhenClosed = false
