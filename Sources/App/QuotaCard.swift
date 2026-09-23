@@ -17,12 +17,12 @@ struct QuotaCard: View {
         VStack(alignment: .leading, spacing: 6) {
             header
             Group {
-                if store.isCollapsed {
+                if store.isExpanded {
+                    rows
+                } else {
                     QuotaSummary(store: store, now: now)
                         .padding(.horizontal, Metrics.textInset)
                         .padding(.vertical, 6)
-                } else {
-                    rows
                 }
             }
             .cardSurface()
@@ -32,18 +32,18 @@ struct QuotaCard: View {
     private var header: some View {
         HStack(spacing: 6) {
             Button {
-                store.isCollapsed.toggle()
+                store.isExpanded.toggle()
             } label: {
                 HStack(spacing: 4) {
                     Text("Quota")
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .semibold))
-                        .rotationEffect(.degrees(store.isCollapsed ? 0 : 90))
+                        .rotationEffect(.degrees(store.isExpanded ? 90 : 0))
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(store.isCollapsed ? "Show every Window" : "Show only the shortest Window")
+            .help(store.isExpanded ? "Show only the shortest Window" : "Show every Window")
             Spacer(minLength: 8)
             refreshButton
         }

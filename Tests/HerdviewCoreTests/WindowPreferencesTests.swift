@@ -35,13 +35,18 @@ final class WindowPreferencesTests: XCTestCase {
         XCTAssertFalse(WindowPreferences(defaults: defaults).isAlwaysOnTop)
     }
 
-    func testQuotaCardIsExpandedUntilTheUserCollapsesIt() {
-        XCTAssertFalse(WindowPreferences(defaults: defaults).isQuotaCollapsed)
+    func testQuotaStartsCollapsed() {
+        XCTAssertFalse(WindowPreferences(defaults: defaults).isQuotaExpanded)
     }
 
-    func testCollapsingTheQuotaCardSurvivesANewPreferencesObject() {
-        WindowPreferences(defaults: defaults).isQuotaCollapsed = true
-        XCTAssertTrue(WindowPreferences(defaults: defaults).isQuotaCollapsed)
+    func testExpandingTheQuotaSurvivesANewPreferencesObject() {
+        WindowPreferences(defaults: defaults).isQuotaExpanded = true
+        XCTAssertTrue(WindowPreferences(defaults: defaults).isQuotaExpanded)
+    }
+
+    func testTheOldCollapsedKeyNoLongerExpandsTheQuota() {
+        defaults.set(false, forKey: "herdview.quotaCollapsed")
+        XCTAssertFalse(WindowPreferences(defaults: defaults).isQuotaExpanded)
     }
 
     func testAgentScopeDefaultsToAll() {

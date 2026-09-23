@@ -17,10 +17,10 @@ final class QuotaStore: ObservableObject {
     /// is under way.
     @Published private(set) var fetching: Set<QuotaProvider> = []
 
-    /// Whether the card is folded down to one line. Remembered across
+    /// Whether the card is expanded to the full list. Remembered across
     /// launches.
-    @Published var isCollapsed: Bool {
-        didSet { preferences.isQuotaCollapsed = isCollapsed }
+    @Published var isExpanded: Bool {
+        didSet { preferences.isQuotaExpanded = isExpanded }
     }
 
     private let preferences: WindowPreferences
@@ -29,7 +29,7 @@ final class QuotaStore: ObservableObject {
         self.providers = providers
         self.preferences = preferences
         entries = Dictionary(uniqueKeysWithValues: providers.map { ($0, .loading) })
-        isCollapsed = preferences.isQuotaCollapsed
+        isExpanded = preferences.isQuotaExpanded
     }
 
     /// What the card's refresh button runs. Set by whoever owns the monitor,
