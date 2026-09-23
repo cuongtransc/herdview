@@ -1,8 +1,9 @@
 import SwiftUI
 import HerdviewCore
 
-/// Every Window of every Provider, one row each: the panel the title bar's
-/// strip expands into. One row per Provider the store lists.
+/// Every Window of every Provider: the panel the title bar's strip expands
+/// into. One block per Provider the store lists, separated by a hairline that
+/// starts where the text does.
 struct QuotaRows: View {
     @ObservedObject var store: QuotaStore
     let now: Date
@@ -15,19 +16,27 @@ struct QuotaRows: View {
                         .fill(Color.primary.opacity(0.08))
                         .frame(maxWidth: .infinity)
                         .frame(height: 1)
-                        .padding(.leading, Metrics.textInset + QuotaRow.textLeading)
+                        .padding(.leading, Metrics.cardInset + QuotaRow.textLeading)
                 }
                 QuotaRow(provider: provider, entry: store.entry(for: provider), now: now)
                     .padding(.horizontal, Metrics.cardInset)
             }
         }
+        .padding(.vertical, Metrics.cardInset)
     }
 }
 
+/// One Provider: its icon, its name on a line of its own, then one line per
+/// Window.
+///
+/// Every Window line has the same columns (label, bar, percent, time to Reset)
+/// at fixed widths, so the bars of every Provider start and end on the same
+/// verticals and two Windows can be compared at a glance, down the panel.
 struct QuotaRow: View {
-    static let textLeading: CGFloat = iconSide + iconGap
-    private static let iconSide: CGFloat = 26
+    static let textLeading: CGFloat = rowInset + iconSide + iconGap
+    private static let iconSide: CGFloat = 22
     private static let iconGap: CGFloat = 10
+    private static let rowInset: CGFloat = 8
 
     let provider: QuotaProvider
     let entry: QuotaEntry
@@ -35,56 +44,40 @@ struct QuotaRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Self.iconGap) {
-            icon
-            VStack(alignment: .leading, spacing: 4) {
-                FlowLayout(spacing: 14, lineSpacing: 4) {
-                    providerName
-                    inlineContent
-                }
-                staleNote
+            ProviderIcon(provider: provider, side: Self.iconSide)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(provider.displayName)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                content
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, Metrics.rowInset)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Self.rowInset)
+        .padding(.vertical, 7)
     }
 
-    /// The name is the first item in the same flow as the Windows. This keeps
-    /// the approved icon → Provider → Window composition at normal widths and
-    /// lets only the items that no longer fit move to following lines.
-    private var providerName: some View {
-        Text(provider.displayName)
-            .font(.system(size: 13, weight: .medium))
-            .lineLimit(1)
-            .fixedSize()
-    }
-
-    @ViewBuilder private var inlineContent: some View {
+    @ViewBuilder private var content: some View {
         switch entry {
         case .loading:
             EmptyView()
         case .notSignedIn:
             note("not signed in")
         case .ok(let report):
-            gauges(report.windows, dimmed: false)
+            lines(report.windows, dimmed: false)
         case .problem(let problem, let last):
             if let last {
-                gauges(last.windows, dimmed: true)
+                lines(last.windows, dimmed: true)
+                note("\(problem.message(for: provider)) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
             } else {
                 note(problem.message(for: provider))
             }
         }
     }
 
-    @ViewBuilder private var staleNote: some View {
-        if case .problem(let problem, let last?) = entry {
-            note("\(problem.message(for: provider)) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
-        }
-    }
-
-    @ViewBuilder private func gauges(_ windows: [QuotaWindow], dimmed: Bool) -> some View {
+    @ViewBuilder private func lines(_ windows: [QuotaWindow], dimmed: Bool) -> some View {
         ForEach(Array(windows.enumerated()), id: \.offset) { _, window in
-            WindowGauge(window: window, now: now)
+            WindowLine(window: window, now: now)
                 .opacity(dimmed ? 0.45 : 1)
         }
     }
@@ -94,10 +87,6 @@ struct QuotaRow: View {
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var icon: some View {
-        ProviderIcon(provider: provider, side: Self.iconSide)
     }
 }
 
@@ -122,108 +111,88 @@ struct ProviderIcon: View {
     }
 }
 
-/// One Window: its label, a thin bar, the percent used, and the time to Reset.
+/// One Window as a row of fixed columns: its label, a bar that takes the rest
+/// of the width, the percent used and the time to Reset.
 ///
 /// A short tick across the bar marks how much of the Window's time has
 /// passed, so a bar that has run past its tick is Quota spent faster than the
 /// clock. Only drawn when the Window's length is known.
 ///
-/// The bar is green while it stays behind the tick and orange once it runs
-/// past it or nears the limit; grey when there is no tick to pace against.
-/// Colour goes on the bar only. Text stays on the label colours, as it does
-/// everywhere in this app, because orange text does not reach a readable
-/// contrast against a light window at this size; a Window near its limit says
-/// so with a heavier weight instead.
-struct WindowGauge: View {
-    private static let barWidth: CGFloat = 44
+/// Colour goes on the bar only (`QuotaBar`). Text stays on the label colours,
+/// as it does everywhere in this app, because orange text does not reach a
+/// readable contrast against a light window at this size; a Window near its
+/// limit says so with a heavier weight instead.
+struct WindowLine: View {
+    /// Wide enough for `week · Fable`, the longest label a Provider sends.
+    private static let labelWidth: CGFloat = 74
+    private static let percentWidth: CGFloat = 30
+    private static let resetWidth: CGFloat = 44
 
     let window: QuotaWindow
     let now: Date
 
     var body: some View {
         let warning = window.usedPercent >= QuotaFormat.warningPercent
-        HStack(spacing: 5) {
+        HStack(spacing: 8) {
             Text(window.label)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(width: Self.labelWidth, alignment: .leading)
+            QuotaBar(window: window, now: now, height: 5, showsPace: true)
+            Text(QuotaFormat.percent(window.usedPercent))
+                .fontWeight(warning ? .semibold : .regular)
+                .foregroundStyle(.primary)
+                .frame(width: Self.percentWidth, alignment: .trailing)
+            Text(QuotaFormat.untilReset(window.resetsAt, now: now) ?? "")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: Self.resetWidth, alignment: .trailing)
+        }
+        .font(.system(size: 11).monospacedDigit())
+    }
+}
+
+/// A Window's bar: the used share filled in its tone, and, when asked for and
+/// the Window's length is known, the yellow tick where the clock is.
+///
+/// It takes whatever width it is given, so the same bar serves the title bar's
+/// fixed mini gauges and the panel's full-width lines.
+struct QuotaBar: View {
+    private static let tickWidth: CGFloat = 2
+
+    let window: QuotaWindow
+    let now: Date
+    let height: CGFloat
+    let showsPace: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.1))
                 Capsule()
-                    .fill(barColor)
-                    .frame(width: Self.barWidth * window.usedPercent / 100)
+                    .fill(color)
+                    .frame(width: width * window.usedPercent / 100)
+                if showsPace,
+                   let elapsed = QuotaFormat.elapsedFraction(resetsAt: window.resetsAt,
+                                                             duration: window.duration, now: now) {
+                    Capsule()
+                        .fill(Color(nsColor: .systemYellow))
+                        .frame(width: Self.tickWidth, height: height + 4)
+                        .offset(x: min(width - Self.tickWidth, max(0, width * elapsed - Self.tickWidth / 2)))
+                }
             }
-            .frame(width: Self.barWidth, height: 4)
-            .overlay(alignment: .leading) { timeMarker }
-            Text(QuotaFormat.percent(window.usedPercent))
-                .fontWeight(warning ? .semibold : .regular)
-                .foregroundStyle(warning ? .primary : .secondary)
-            if let until = QuotaFormat.untilReset(window.resetsAt, now: now) {
-                Text("· \(until)")
-                    .foregroundStyle(.tertiary)
-            }
+            .frame(height: proxy.size.height)
         }
-        .font(.system(size: 11).monospacedDigit())
-        .lineLimit(1)
-        .fixedSize()
+        .frame(height: height)
     }
 
-    private var barColor: Color {
+    private var color: Color {
         switch QuotaFormat.tone(of: window, now: now) {
         case .neutral: return .secondary
         case .onPace: return Color(nsColor: .systemGreen)
         case .warning: return Color(nsColor: .systemOrange)
         }
-    }
-
-    @ViewBuilder private var timeMarker: some View {
-        if let elapsed = QuotaFormat.elapsedFraction(resetsAt: window.resetsAt, duration: window.duration, now: now) {
-            let width = Self.markerWidth
-            Capsule()
-                .fill(Color(nsColor: .systemYellow))
-                .frame(width: width, height: 10)
-                .offset(x: min(Self.barWidth - width, max(0, Self.barWidth * elapsed - width / 2)))
-        }
-    }
-
-    private static let markerWidth: CGFloat = 2
-}
-
-/// Lays its children out left to right and wraps to a new line when the next
-/// one does not fit, so a row's Windows fold under each other as the window
-/// narrows instead of being cut off.
-struct FlowLayout: Layout {
-    let spacing: CGFloat
-    let lineSpacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let placements = place(subviews, width: proposal.width ?? .infinity)
-        let width = placements.map { $0.origin.x + $0.size.width }.max() ?? 0
-        let height = placements.map { $0.origin.y + $0.size.height }.max() ?? 0
-        return CGSize(width: width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, place(subviews, width: bounds.width)) {
-            subview.place(at: CGPoint(x: bounds.minX + frame.origin.x, y: bounds.minY + frame.origin.y),
-                          proposal: ProposedViewSize(frame.size))
-        }
-    }
-
-    private func place(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
-        var frames: [CGRect] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width {
-                x = 0
-                y += lineHeight + lineSpacing
-                lineHeight = 0
-            }
-            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
-            x += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
-        }
-        return frames
     }
 }

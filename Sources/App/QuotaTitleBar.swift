@@ -35,15 +35,15 @@ struct QuotaTitleBar: View {
     }
 
     /// The title bar's row: the collapsed strip or the expanded header, never
-    /// both. The strip is trailing-aligned so it reads as one thing held at the
-    /// window's edge; the header spans the row so its label has somewhere to
-    /// start.
+    /// both. Either is trailing-aligned, so the control stays where the eye left
+    /// it when it swaps, and the empty part of the row is still the window's to
+    /// drag.
     private var titleBarRow: some View {
         HStack(spacing: 6) {
+            Spacer(minLength: 0)
             if store.isExpanded {
                 expandedHeader
             } else {
-                Spacer(minLength: 0)
                 collapsedStrip
             }
         }
@@ -91,33 +91,41 @@ struct QuotaTitleBar: View {
 
     // MARK: - Expanded
 
-    /// The header in the title bar's row. Everything in it collapses except the
-    /// refresh button, which is why the collapse button sits behind the refresh
-    /// button rather than around it: a button inside a button would leave the
-    /// refresh's own clicks to whichever one SwiftUI happened to hit first.
+    /// The header in the title bar's row: `Quota · updated 2m ago`, the refresh
+    /// button, the chevron. Everything in it collapses except the refresh
+    /// button, which sits between two collapse buttons rather than inside one: a
+    /// button inside a button would leave the refresh's own clicks to whichever
+    /// one SwiftUI happened to hit first.
     private var expandedHeader: some View {
-        ZStack(alignment: .trailing) {
+        HStack(spacing: 8) {
             Button {
                 setExpanded(false)
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text("Quota")
-                    Spacer(minLength: 8)
+                    if let updated = QuotaFormat.lastUpdated(store.providers.map(store.entry(for:))) {
+                        Text("· \(QuotaFormat.updatedAgo(updated, now: now))")
+                            .fontWeight(.regular)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Show only the short and weekly Windows")
 
-            HStack(spacing: 6) {
-                refreshButton
+            refreshButton
+
+            Button {
+                setExpanded(false)
+            } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    // A chevron is a direction, not a control of its own: the
-                    // click belongs to the collapse button underneath.
-                    .allowsHitTesting(false)
+                    .frame(width: 14, height: 14)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help("Show only the short and weekly Windows")
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)
@@ -174,6 +182,7 @@ private struct QuotaMiniGauge: View {
     private static let barWidth: CGFloat = 30
     private static let barHeight: CGFloat = 4
     private static let iconSide: CGFloat = 18
+    private static let percentWidth: CGFloat = 24
 
     let provider: QuotaProvider
     let entry: QuotaEntry
@@ -213,27 +222,17 @@ private struct QuotaMiniGauge: View {
     private func line(_ window: QuotaWindow) -> some View {
         let warning = window.usedPercent >= QuotaFormat.warningPercent
         return HStack(spacing: 4) {
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.1))
-                Capsule()
-                    .fill(barColor(window))
-                    .frame(width: Self.barWidth * window.usedPercent / 100)
-            }
-            .frame(width: Self.barWidth, height: Self.barHeight)
+            QuotaBar(window: window, now: now, height: Self.barHeight, showsPace: false)
+                .frame(width: Self.barWidth)
             if showPercent {
+                // A fixed column, so a Provider's two bars line up and the
+                // strip does not shift as a percent gains a digit.
                 Text(QuotaFormat.percent(window.usedPercent))
                     .font(.system(size: 9.5).monospacedDigit())
                     .fontWeight(warning ? .semibold : .regular)
-                    .foregroundStyle(warning ? .primary : .secondary)
+                    .foregroundStyle(.primary)
+                    .frame(width: Self.percentWidth, alignment: .leading)
             }
-        }
-    }
-
-    private func barColor(_ window: QuotaWindow) -> Color {
-        switch QuotaFormat.tone(of: window, now: now) {
-        case .neutral: return .secondary
-        case .onPace: return Color(nsColor: .systemGreen)
-        case .warning: return Color(nsColor: .systemOrange)
         }
     }
 

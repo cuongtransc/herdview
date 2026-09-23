@@ -160,4 +160,27 @@ final class QuotaFormatTests: XCTestCase {
     func testTitleBarOfNoWindowsIsEmpty() {
         XCTAssertEqual(titleBarLabels([]), [])
     }
+
+    // MARK: Last updated
+
+    private func report(fetchedAgo seconds: TimeInterval) -> QuotaReport {
+        QuotaReport(provider: .claude, windows: [], fetchedAt: now.addingTimeInterval(-seconds))
+    }
+
+    /// The header says how fresh the panel is as a whole: the newest numbers on
+    /// it, stale ones included, since those are still being shown.
+    func testLastUpdatedIsTheNewestReportShown() {
+        let entries: [QuotaEntry] = [
+            .ok(report(fetchedAgo: 300)),
+            .problem(.rateLimited, last: report(fetchedAgo: 60)),
+            .loading,
+            .notSignedIn,
+        ]
+        XCTAssertEqual(QuotaFormat.lastUpdated(entries), now.addingTimeInterval(-60))
+    }
+
+    func testLastUpdatedWithNothingFetchedIsNil() {
+        XCTAssertNil(QuotaFormat.lastUpdated([.loading, .notSignedIn, .problem(.noSubscription, last: nil)]))
+        XCTAssertNil(QuotaFormat.lastUpdated([]))
+    }
 }

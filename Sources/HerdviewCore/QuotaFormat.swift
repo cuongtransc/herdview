@@ -71,6 +71,13 @@ public enum QuotaFormat {
         return [summary, week]
     }
 
+    /// When the newest numbers the panel shows were fetched, stale ones
+    /// included, since those are still on screen. `nil` before anything has
+    /// been fetched.
+    public static func lastUpdated(_ entries: [QuotaEntry]) -> Date? {
+        entries.compactMap(\.lastReport?.fetchedAt).max()
+    }
+
     /// How old the numbers on a row with a problem are.
     public static func updatedAgo(_ fetchedAt: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(fetchedAt)))
