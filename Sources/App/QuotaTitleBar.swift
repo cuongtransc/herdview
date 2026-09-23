@@ -34,10 +34,6 @@ struct QuotaTitleBar: View {
         TimelineView(.periodic(from: .now, by: Self.tick)) { context in
             row(now: context.date)
         }
-        // This hosting view *is* the title bar's row, so the title bar's safe
-        // area is the whole of it; honouring that inset would push the strip
-        // down out of the row it exists to sit in.
-        .ignoresSafeArea()
     }
 
     /// The title bar's row: the collapsed strip or the expanded header, never

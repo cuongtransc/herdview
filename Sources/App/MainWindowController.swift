@@ -195,7 +195,7 @@ final class MainWindowController: NSObject {
     private static func layTitleBar<Content: View>(_ content: Content, over window: NSWindow) -> NSView? {
         guard let backdrop = window.contentView,
               let guide = window.contentLayoutGuide as? NSLayoutGuide else { return nil }
-        let hosting = NSHostingView(rootView: content)
+        let hosting = TitleBarHostingView(rootView: content)
         hosting.translatesAutoresizingMaskIntoConstraints = false
         backdrop.addSubview(hosting)
         NSLayoutConstraint.activate([
@@ -258,4 +258,13 @@ extension MainWindowController: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         reportHidden()
     }
+}
+
+/// The title bar row's hosting view. The row lies wholly inside the title bar,
+/// which AppKit counts as unsafe, and SwiftUI would lay the strip out below
+/// that inset — or, told to ignore it, stretch the row above the window's top
+/// edge and centre the strip a few points too high. The row is exactly where
+/// its content belongs, so it has no unsafe area at all.
+private final class TitleBarHostingView<Content: View>: NSHostingView<Content> {
+    override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }
 }
