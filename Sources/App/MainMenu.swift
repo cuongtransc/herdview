@@ -7,10 +7,11 @@ import AppKit
 @MainActor
 enum MainMenu {
     /// The items the menu cannot wire up itself. The menu is built before the
-    /// window exists, so `Keep on Top` goes back to the caller to point at the
-    /// window controller once there is one.
+    /// window exists, so `Keep on Top` and `Find…` go back to the caller to
+    /// point at the window controller once there is one.
     struct Items {
         let keepOnTop: NSMenuItem
+        let find: NSMenuItem
     }
 
     @discardableResult
@@ -40,6 +41,48 @@ enum MainMenu {
                         action: #selector(NSApplication.terminate(_:)),
                         keyEquivalent: "q")
 
+        // A text field has no ⌘V without an Edit menu, because the key
+        // equivalents live on menu items: the field editor knows how to paste,
+        // but nothing in the app would ever tell it to. Undo, Redo and the
+        // clipboard entries are all left to the responder chain, so whichever
+        // field is first responder decides what they mean. Find is the one
+        // exception — it is this app's own action, so it is built with no
+        // action at all and `MainWindowController` targets it once there is a
+        // window to point at.
+        let editItem = NSMenuItem()
+        main.addItem(editItem)
+        let editMenu = NSMenu(title: "Edit")
+        editItem.submenu = editMenu
+        // Double parens: undo and redo are resolved by AppKit at send time
+        // through the responder chain, so there is no compile-time `#selector`
+        // for them.
+        editMenu.addItem(withTitle: "Undo",
+                         action: Selector(("undo:")),
+                         keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "Redo",
+                                    action: Selector(("redo:")),
+                                    keyEquivalent: "z")
+        // ⇧⌘Z, the standard Redo shortcut; without the mask it would collide
+        // with Undo's plain ⌘Z.
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut",
+                         action: #selector(NSText.cut(_:)),
+                         keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy",
+                         action: #selector(NSText.copy(_:)),
+                         keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste",
+                         action: #selector(NSText.paste(_:)),
+                         keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All",
+                         action: #selector(NSText.selectAll(_:)),
+                         keyEquivalent: "a")
+        editMenu.addItem(.separator())
+        let find = editMenu.addItem(withTitle: "Find…",
+                                    action: nil,
+                                    keyEquivalent: "f")
+
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
         let windowMenu = NSMenu(title: "Window")
@@ -61,6 +104,6 @@ enum MainMenu {
 
         NSApp.mainMenu = main
         NSApp.windowsMenu = windowMenu
-        return Items(keepOnTop: keepOnTop)
+        return Items(keepOnTop: keepOnTop, find: find)
     }
 }

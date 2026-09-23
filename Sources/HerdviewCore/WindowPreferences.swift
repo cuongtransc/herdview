@@ -7,6 +7,7 @@ import Foundation
 public struct WindowPreferences {
     private static let alwaysOnTopKey = "herdview.alwaysOnTop"
     private static let quotaCollapsedKey = "herdview.quotaCollapsed"
+    private static let agentScopeKey = "herdview.agentScope"
 
     private let defaults: UserDefaults
 
@@ -25,5 +26,13 @@ public struct WindowPreferences {
     public var isQuotaCollapsed: Bool {
         get { defaults.bool(forKey: Self.quotaCollapsedKey) }
         nonmutating set { defaults.set(newValue, forKey: Self.quotaCollapsedKey) }
+    }
+
+    /// The status scope is worth returning to, but a typed search is not: a
+    /// query is a passing thought and remembering it would come back next
+    /// launch to filter the list the user meant to see in full.
+    public var agentScope: AgentScope {
+        get { AgentScope(rawValue: defaults.string(forKey: Self.agentScopeKey) ?? "") ?? .all }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: Self.agentScopeKey) }
     }
 }

@@ -25,6 +25,12 @@ Herdr's classification of an Agent, taken verbatim: `idle`, `working`, `blocked`
 or `unknown`. Herdview never derives Status itself.
 _Avoid_: State, waiting, registered
 
+**Filter**:
+What the window lists right now: agents matching the search text and the status scope.
+It never changes Status, Notifications or the menu bar item, and it never hides an Agent
+that asks for a person without saying so.
+_Avoid_: search, view, query
+
 **Transition**:
 An Agent changing from one Status to another as observed by Herdview. Only transitions
 into `blocked` and `done` ask for a person, and those are the ones that produce a

@@ -64,6 +64,19 @@ where you put it and how big you made it. `Keep on Top` in the Window menu
 you work elsewhere; it is off until you ask for it, and remembered between
 launches.
 
+A strip above the list narrows what the window shows: a search field that matches
+the host, session, directory, agent kind, name and title — case- and
+accent-insensitive, whitespace-separated words ANDed — beside a set of scopes
+(`All`, `Needs me`, `Working`, `Idle`) whose segment counts stay live as the
+text filters. ⌘F focuses the field from anywhere (Edit › Find…), and Esc clears
+it. When the filter hides an agent that is asking for a person — `blocked` or
+`done` — an orange banner counts how many are hidden and offers a Show button;
+hosts with no match drop out, a footer says "Filter hides N agents · M hosts"
+with a Clear button, and an empty match stands in as a "No agents match" notice.
+The scope you pick is remembered between launches; the search text is not.
+Notifications and the menu bar item are untouched — the filter only changes what
+the window lists.
+
 When an agent turns `blocked` or `done`, macOS also posts a notification: the
 same directory, session and title the row shows, and clicking it brings the
 window up. You are asked for permission the first time the app runs. One agent

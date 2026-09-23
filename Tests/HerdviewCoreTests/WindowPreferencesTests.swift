@@ -43,4 +43,18 @@ final class WindowPreferencesTests: XCTestCase {
         WindowPreferences(defaults: defaults).isQuotaCollapsed = true
         XCTAssertTrue(WindowPreferences(defaults: defaults).isQuotaCollapsed)
     }
+
+    func testAgentScopeDefaultsToAll() {
+        XCTAssertEqual(WindowPreferences(defaults: defaults).agentScope, .all)
+    }
+
+    func testChoosingAStatusScopeSurvivesANewPreferencesObject() {
+        WindowPreferences(defaults: defaults).agentScope = .needsMe
+        XCTAssertEqual(WindowPreferences(defaults: defaults).agentScope, .needsMe)
+    }
+
+    func testAnUnknownStoredScopeReadsBackAsAll() {
+        defaults.set("bogus", forKey: "herdview.agentScope")
+        XCTAssertEqual(WindowPreferences(defaults: defaults).agentScope, .all)
+    }
 }
