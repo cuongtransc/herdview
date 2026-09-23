@@ -6,7 +6,7 @@ import Foundation
 /// window floats above other apps.
 public struct WindowPreferences {
     private static let alwaysOnTopKey = "herdview.alwaysOnTop"
-    private static let quotaCollapsedKey = "herdview.quotaCollapsed"
+    private static let quotaExpandedKey = "herdview.quotaExpanded"
     private static let agentScopeKey = "herdview.agentScope"
 
     private let defaults: UserDefaults
@@ -22,10 +22,12 @@ public struct WindowPreferences {
         nonmutating set { defaults.set(newValue, forKey: Self.alwaysOnTopKey) }
     }
 
-    /// Expanded until the user folds the Quota card down to one line.
-    public var isQuotaCollapsed: Bool {
-        get { defaults.bool(forKey: Self.quotaCollapsedKey) }
-        nonmutating set { defaults.set(newValue, forKey: Self.quotaCollapsedKey) }
+    /// Collapsed until the user asks for the full list: the title bar strip
+    /// already answers "can I keep going", and the list below is the window's
+    /// main job.
+    public var isQuotaExpanded: Bool {
+        get { defaults.bool(forKey: Self.quotaExpandedKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.quotaExpandedKey) }
     }
 
     /// The status scope is worth returning to, but a typed search is not: a

@@ -85,20 +85,25 @@ rather than leaving a stack behind — and no banner is shown while Herdview is 
 app in front, since the blinking row is already saying it. There is no switch for
 this in the app; the switch is System Settings › Notifications › Herdview.
 
-Above the hosts, a Quota card shows how much of each plan is used: one row per
-Provider, minus anything in `hidden_providers` — a Provider you have no account
-for is a row that can only ever say "not signed in". A hidden Provider is not
-fetched either, so its credential file is not even read. Every Window — `5h`,
-`week`, `month`, or a per-model week like `week · Fable` — shows the percent used
-and how long until it
-resets. A yellow tick on the bar marks how much of the Window's time has passed:
-the bar is green while it stays behind the tick and turns orange once it runs past
-it, being spent faster than the clock, or reaches 90%. A `month`, whose length
-varies, has no tick and a grey bar until 90%. Clicking
-"Quota" folds the card to one line with each Provider's shortest Window, and the
-card stays folded next launch. The numbers come from each CLI's own
-sign-in on this Mac, never from the remote hosts, since every host spends the
-same accounts:
+Beside the traffic lights in the window's title bar, a Quota strip shows how
+much of each plan is used. Collapsed — the default — it holds one item per
+Provider, minus anything in `hidden_providers`: the Provider's icon, its
+shortest Window, and its `week`, each as a mini bar, with its percent when
+there is room. A Provider with no numbers — still loading, not signed in, or
+a problem with no last report — shows just its icon. A hidden Provider is not
+fetched either, so its credential file is not even read.
+Clicking the strip expands it in place, pushing the filter and list down. Every
+Window — `5h`, `week`, `month`, or a per-model week like `week · Fable` — shows
+the percent used and how long until it resets. A yellow tick on the bar marks
+how much of the Window's time has passed: the bar is green while it stays behind
+the tick and turns orange once it runs past it, being spent faster than the
+clock, or reaches 90%. A `month`, whose length varies, has no tick and a grey
+bar until 90%. A stale note appears when a Provider's numbers are old. Clicking
+the header row again, or its chevron-up, collapses the strip, and it stays in
+whichever state you left it next launch. The ↻ refresh button sits in the
+expanded header, refreshing without collapsing, and is only visible while
+expanded. The numbers come from each CLI's own sign-in on this Mac, never from
+the remote hosts, since every host spends the same accounts:
 
 | Provider | Credential read |
 |---|---|
@@ -113,10 +118,11 @@ CLI you have not used for a few hours may show
 "sign-in expired — run grok" with its last numbers dimmed; running that CLI
 once brings it back. A CLI that is not signed in shows "not signed in". Quota
 is fetched every 5 minutes, and when the window is shown, but only while the
-window is visible; the ↻ button beside "Quota" fetches it at once, unless a
-Provider is waiting out a rate limit. The first read of Claude's Keychain item may ask for
-permission; choose Always Allow. None of these usage endpoints is documented,
-so a row that says "unreadable response" means a Provider changed its API.
+window is visible; the ↻ button in the expanded strip's header fetches it at
+once, unless a Provider is waiting out a rate limit. The first read of
+Claude's Keychain item may ask for permission; choose Always Allow. None of
+these usage endpoints is documented, so a row that says "unreadable response"
+means a Provider changed its API.
 
 The menu bar item shows how many agents are `blocked`, in orange, and clicking it
 shows or hides the window. Closing the window does not quit the app: the herd
@@ -134,6 +140,7 @@ mise trust                     # once, so mise will load mise.toml
 mise run                       # release .app → build/Herdview.app
 mise run run                   # build and open
 mise run test                  # swift test
+mise run ui:shots              # window from fixtures → build/ui-shots/*.png, checks clicks and alignment
 mise run clean
 mise run icon --color 5C43DC   # redraw scripts/AppIcon.icns (the default accent if --color is left out)
 ```

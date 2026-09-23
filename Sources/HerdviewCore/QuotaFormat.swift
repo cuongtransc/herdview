@@ -1,6 +1,6 @@
 import Foundation
 
-/// The words and numbers the Quota card prints.
+/// The words and numbers the Quota views print.
 public enum QuotaFormat {
     /// From here up a Window is drawn in the warning colour.
     public static let warningPercent: Double = 90
@@ -59,6 +59,23 @@ public enum QuotaFormat {
     /// has a length.
     public static func summaryWindow(of windows: [QuotaWindow]) -> QuotaWindow? {
         windows.filter { $0.duration != nil }.min { $0.duration! < $1.duration! } ?? windows.first
+    }
+
+    /// The Windows the title bar strip shows for a Provider, short one first:
+    /// `summaryWindow`, then its `week` if that is a different Window. At most two.
+    public static func titleBarWindows(of windows: [QuotaWindow]) -> [QuotaWindow] {
+        guard let summary = summaryWindow(of: windows) else { return [] }
+        let week = windows.first { $0.label == "week" }
+            ?? windows.first { $0.duration == 604_800 }
+        guard let week, week != summary else { return [summary] }
+        return [summary, week]
+    }
+
+    /// When the newest numbers the panel shows were fetched, stale ones
+    /// included, since those are still on screen. `nil` before anything has
+    /// been fetched.
+    public static func lastUpdated(_ entries: [QuotaEntry]) -> Date? {
+        entries.compactMap(\.lastReport?.fetchedAt).max()
     }
 
     /// How old the numbers on a row with a problem are.
