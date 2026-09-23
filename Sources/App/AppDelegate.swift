@@ -16,6 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A shots run draws fixtures and exits; none of the real app starts.
+        if let directory = UIShots.outputDirectory {
+            UIShots.run(into: directory, menuItems: menuItems)
+            return
+        }
         var config = HerdviewConfig(hosts: [])
         do {
             let load = try ConfigLoader.loadOrCreate()

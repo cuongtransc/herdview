@@ -37,3 +37,12 @@ run = """
 swift package clean
 rm -rf build/Herdview.app
 """
+
+[tasks."ui:shots"]
+description = "Draw the window from fixtures into build/ui-shots/*.png and check its clicks land; exits 1 on a failed check"
+run = """
+./scripts/build-app.sh debug
+rm -rf build/ui-shots
+mkdir -p build/ui-shots
+HERDVIEW_UI_SHOTS="$PWD/build/ui-shots" ./build/Herdview.app/Contents/MacOS/herdview
+"""

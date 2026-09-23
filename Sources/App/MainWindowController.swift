@@ -25,11 +25,14 @@ import SwiftUI
 final class MainWindowController: NSObject {
     private static let frameAutosaveName = "herdview.mainWindow"
 
-    private let window: NSWindow
+    /// Internal rather than private for `UIShots`, which drives this window.
+    let window: NSWindow
     private let store: AgentStore
     private let preferences: WindowPreferences
     private let keepOnTopItem: NSMenuItem?
-    private let filterState: FilterState
+    let filterState: FilterState
+    /// The title bar row's own hosting view, which `UIShots` checks clicks land on.
+    private(set) var titleBarView: NSView?
     private var reportedVisible = false
 
     /// Visibility hooks keep Quota work aligned with AppKit, including actions
@@ -41,7 +44,8 @@ final class MainWindowController: NSObject {
          quotaStore: QuotaStore,
          preferences: WindowPreferences = WindowPreferences(),
          keepOnTopItem: NSMenuItem? = nil,
-         findItem: NSMenuItem? = nil) {
+         findItem: NSMenuItem? = nil,
+         autosavesFrame: Bool = true) {
         self.store = store
         self.preferences = preferences
         self.keepOnTopItem = keepOnTopItem
@@ -68,7 +72,7 @@ final class MainWindowController: NSObject {
         window.isReleasedWhenClosed = false
         window.contentViewController = Self.backdrop(
             around: AgentListView(store: store, quotaStore: quotaStore, filter: filterState))
-        Self.layTitleBar(QuotaTitleBar(store: quotaStore), over: window)
+        let titleBarView = Self.layTitleBar(QuotaTitleBar(store: quotaStore), over: window)
         // The window has to stop painting its own opaque grey before anything
         // behind it can show through the backdrop.
         window.isOpaque = false
@@ -76,12 +80,20 @@ final class MainWindowController: NSObject {
         window.titlebarAppearsTransparent = true
         // Remember where the user put it. Without a saved frame the window lands
         // in the bottom-left corner, so the first launch centres it instead.
-        if !window.setFrameUsingName(Self.frameAutosaveName) {
+        // `UIShots` turns this off: its resizes must not become the size the
+        // user's window opens at next time.
+        if !autosavesFrame {
+            window.center()
+        } else if !window.setFrameUsingName(Self.frameAutosaveName) {
             window.center()
         }
-        _ = window.setFrameAutosaveName(Self.frameAutosaveName)
+        if autosavesFrame {
+            _ = window.setFrameAutosaveName(Self.frameAutosaveName)
+        }
 
         super.init()
+
+        self.titleBarView = titleBarView
 
         window.delegate = self
 
@@ -179,9 +191,10 @@ final class MainWindowController: NSObject {
     /// The row runs from the window's top edge down to the content layout
     /// guide, which is exactly the title bar's height, and follows it if AppKit
     /// ever changes it.
-    private static func layTitleBar<Content: View>(_ content: Content, over window: NSWindow) {
+    @discardableResult
+    private static func layTitleBar<Content: View>(_ content: Content, over window: NSWindow) -> NSView? {
         guard let backdrop = window.contentView,
-              let guide = window.contentLayoutGuide as? NSLayoutGuide else { return }
+              let guide = window.contentLayoutGuide as? NSLayoutGuide else { return nil }
         let hosting = NSHostingView(rootView: content)
         hosting.translatesAutoresizingMaskIntoConstraints = false
         backdrop.addSubview(hosting)
@@ -191,6 +204,7 @@ final class MainWindowController: NSObject {
             hosting.topAnchor.constraint(equalTo: backdrop.topAnchor),
             hosting.bottomAnchor.constraint(equalTo: guide.topAnchor),
         ])
+        return hosting
     }
 
     private static func backdrop<Content: View>(around content: Content) -> NSViewController {
