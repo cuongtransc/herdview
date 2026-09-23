@@ -141,6 +141,9 @@ struct QuotaTitleBar: View {
             ProgressView()
                 .controlSize(.mini)
                 .frame(width: 14, height: 14)
+                // The spinner is not a control: a click in this slot belongs
+                // to neither refresh nor collapse.
+                .allowsHitTesting(false)
         }
     }
 
@@ -178,9 +181,19 @@ private struct QuotaMiniGauge: View {
     let showPercent: Bool
 
     var body: some View {
-        let windows = entry.lastReport.map { QuotaFormat.titleBarWindows(of: $0.windows) } ?? []
+        let windows: [QuotaWindow]
         let fresh: Bool
-        if case .ok = entry { fresh = true } else { fresh = false }
+        switch entry {
+        case .ok(let report):
+            windows = QuotaFormat.titleBarWindows(of: report.windows)
+            fresh = true
+        case .problem(_, let last?):
+            windows = QuotaFormat.titleBarWindows(of: last.windows)
+            fresh = false
+        default:
+            windows = []
+            fresh = false
+        }
         return HStack(spacing: 5) {
             ProviderIcon(provider: provider, side: Self.iconSide)
                 .opacity(windows.isEmpty ? 0.45 : 1)
@@ -200,9 +213,13 @@ private struct QuotaMiniGauge: View {
     private func line(_ window: QuotaWindow) -> some View {
         let warning = window.usedPercent >= QuotaFormat.warningPercent
         return HStack(spacing: 4) {
-            Capsule()
-                .fill(barColor(window))
-                .frame(width: Self.barWidth, height: Self.barHeight)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.1))
+                Capsule()
+                    .fill(barColor(window))
+                    .frame(width: Self.barWidth * window.usedPercent / 100)
+            }
+            .frame(width: Self.barWidth, height: Self.barHeight)
             if showPercent {
                 Text(QuotaFormat.percent(window.usedPercent))
                     .font(.system(size: 9.5).monospacedDigit())

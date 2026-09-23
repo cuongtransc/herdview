@@ -47,6 +47,10 @@ final class WindowPreferencesTests: XCTestCase {
     func testTheOldCollapsedKeyNoLongerExpandsTheQuota() {
         defaults.set(false, forKey: "herdview.quotaCollapsed")
         XCTAssertFalse(WindowPreferences(defaults: defaults).isQuotaExpanded)
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(true, forKey: "herdview.quotaCollapsed")
+        XCTAssertFalse(WindowPreferences(defaults: defaults).isQuotaExpanded)
     }
 
     func testAgentScopeDefaultsToAll() {

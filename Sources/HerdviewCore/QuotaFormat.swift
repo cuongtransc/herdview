@@ -1,6 +1,6 @@
 import Foundation
 
-/// The words and numbers the Quota card prints.
+/// The words and numbers the Quota views print.
 public enum QuotaFormat {
     /// From here up a Window is drawn in the warning colour.
     public static let warningPercent: Double = 90

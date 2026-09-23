@@ -88,9 +88,10 @@ this in the app; the switch is System Settings › Notifications › Herdview.
 Beside the traffic lights in the window's title bar, a Quota strip shows how
 much of each plan is used. Collapsed — the default — it holds one item per
 Provider, minus anything in `hidden_providers`: the Provider's icon, its
-shortest Window, and its `week`, each as a mini bar with its percent. A Provider
-with no numbers — still loading, or not signed in — shows just its icon. A
-hidden Provider is not fetched either, so its credential file is not even read.
+shortest Window, and its `week`, each as a mini bar, with its percent when
+there is room. A Provider with no numbers — still loading, not signed in, or
+a problem with no last report — shows just its icon. A hidden Provider is not
+fetched either, so its credential file is not even read.
 Clicking the strip expands it in place, pushing the filter and list down. Every
 Window — `5h`, `week`, `month`, or a per-model week like `week · Fable` — shows
 the percent used and how long until it resets. A yellow tick on the bar marks
@@ -118,9 +119,10 @@ CLI you have not used for a few hours may show
 once brings it back. A CLI that is not signed in shows "not signed in". Quota
 is fetched every 5 minutes, and when the window is shown, but only while the
 window is visible; the ↻ button in the expanded strip's header fetches it at
-once, unless a Provider is waiting out a rate limit. The first read of Claude's Keychain item may ask for
-permission; choose Always Allow. None of these usage endpoints is documented,
-so a row that says "unreadable response" means a Provider changed its API.
+once, unless a Provider is waiting out a rate limit. The first read of
+Claude's Keychain item may ask for permission; choose Always Allow. None of
+these usage endpoints is documented, so a row that says "unreadable response"
+means a Provider changed its API.
 
 The menu bar item shows how many agents are `blocked`, in orange, and clicking it
 shows or hides the window. Closing the window does not quit the app: the herd

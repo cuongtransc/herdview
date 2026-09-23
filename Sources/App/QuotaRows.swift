@@ -2,12 +2,7 @@ import SwiftUI
 import HerdviewCore
 
 /// Every Window of every Provider, one row each: the panel the title bar's
-/// strip expands into.
-///
-/// One row per Provider the config watches, always, so a missing row can never
-/// be read as "no limit" — the only row that is absent is one
-/// `hidden_providers` asked not to show, and that is the user saying they have
-/// no such account to spend.
+/// strip expands into. One row per Provider the store lists.
 struct QuotaRows: View {
     @ObservedObject var store: QuotaStore
     let now: Date
