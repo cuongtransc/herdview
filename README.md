@@ -137,16 +137,19 @@ reached through `ssh -N -L ~/.herdview/sock/<host>-<session>.sock:<remote socket
 
 ```bash
 mise trust                     # once, so mise will load mise.toml
-mise run                       # release .app → build/Herdview.app
-mise run run                   # build and open
-mise run test                  # swift test
+mise run dev                   # debug build → build/Herdview.app, quit any running Herdview, open the new one
+mise run build                 # release build/Herdview.app (CONFIG=debug for unoptimised); doesn't launch it
+mise run test                  # unit tests
 mise run ui:shots              # window from fixtures → build/ui-shots/*.png, checks clicks and alignment
+mise run ci                    # the gate before a PR: test, then ui:shots
 mise run clean
 mise run icon --color 5C43DC   # redraw scripts/AppIcon.icns (the default accent if --color is left out)
 ```
 
-`CONFIG=debug mise run app` builds unoptimised. `mise run build` is the plain
-compile check, without the .app around it.
+To keep a build you use every day, `mise run build` and copy
+`build/Herdview.app` into `/Applications`. `mise run dev` quits whichever
+Herdview is running first: the bundle id is the same for every build, so
+opening a new one while another runs only brings the old one forward.
 
 Or without mise: `swift test && ./scripts/build-app.sh && open build/Herdview.app`.
 
