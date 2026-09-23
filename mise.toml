@@ -1,29 +1,51 @@
-# Herdview — tasks. `mise run` builds the .app; `mise run <task>` for the rest.
+# Herdview — tasks. `mise tasks` lists them; `mise run <task>` runs one.
 # Run `mise trust` once so mise will load this file.
 
-[tasks.default]
-description = "Build the release .app (same as `mise run app`)"
-depends = ["app"]
+# The bundle id is fixed, so `open` on a fresh build while any Herdview is
+# running only brings the old one forward. Quit it first, and wait for it to go.
+[tasks.dev]
+description = "Build a debug Herdview.app and (re)launch it"
+run = """
+./scripts/build-app.sh debug
+if pgrep -x herdview >/dev/null; then
+  osascript -e 'tell application id "com.herdview.app" to quit'
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x herdview >/dev/null || break; sleep 0.5; done
+  if pgrep -x herdview >/dev/null; then
+    echo "a running Herdview would not quit; quit it and retry" >&2
+    exit 1
+  fi
+fi
+open build/Herdview.app
+"""
 
 [tasks.build]
-description = "Compile the package; CONFIG=debug for an unoptimised build"
-run = "swift build -c ${CONFIG:-release}"
-
-[tasks.app]
-description = "Build build/Herdview.app and ad-hoc sign it; CONFIG=debug to match `build`"
+description = "Build build/Herdview.app (release); CONFIG=debug for unoptimised"
 run = "./scripts/build-app.sh ${CONFIG:-release}"
 
-[tasks.run]
-description = "Build the .app and open it"
-depends = ["app"]
-run = "open build/Herdview.app"
-
 [tasks.test]
-description = "Run the test suite"
+description = "Run the unit tests"
 run = "swift test"
 
+[tasks."ui:shots"]
+description = "Draw the window from fixtures to build/ui-shots and check it"
+run = """
+./scripts/build-app.sh debug
+rm -rf build/ui-shots
+mkdir -p build/ui-shots
+HERDVIEW_UI_SHOTS="$PWD/build/ui-shots" ./build/Herdview.app/Contents/MacOS/herdview
+"""
+
+# Sequential rather than `depends`: both steps compile the same package, and
+# two SwiftPM builds in one .build directory wait on each other's lock anyway.
+[tasks.ci]
+description = "The gate before a PR: unit tests, then the UI shots checks"
+run = """
+mise run test
+mise run ui:shots
+"""
+
 [tasks.icon]
-description = "Redraw scripts/AppIcon.icns; the default accent unless --color is given"
+description = "Redraw scripts/AppIcon.icns; the default accent unless --color"
 usage = 'flag "--color <hex>" help="Accent as RRGGBB (default E07B00); quote it if you pass the #"'
 run = """
 mkdir -p build
@@ -32,17 +54,8 @@ swiftc -parse-as-library -O scripts/make-icon.swift Sources/App/HerdMark.swift -
 """
 
 [tasks.clean]
-description = "Remove the build products"
+description = "Remove the build products and the UI shots"
 run = """
 swift package clean
-rm -rf build/Herdview.app
-"""
-
-[tasks."ui:shots"]
-description = "Draw the window from fixtures into build/ui-shots/*.png and check its clicks land; exits 1 on a failed check"
-run = """
-./scripts/build-app.sh debug
-rm -rf build/ui-shots
-mkdir -p build/ui-shots
-HERDVIEW_UI_SHOTS="$PWD/build/ui-shots" ./build/Herdview.app/Contents/MacOS/herdview
+rm -rf build/Herdview.app build/ui-shots build/make-icon
 """
