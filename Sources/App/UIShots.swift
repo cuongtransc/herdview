@@ -90,11 +90,11 @@ enum UIShots {
 
             await state(size: UIShots.wide, dark: false, expanded: false)
             checkTitleBarHit(named: "strip", at: stripPoint)
-            await shoot("01-collapsed")
+            checkCentredOnWindowButtons("collapsed strip", await shoot("01-collapsed"))
 
             await click(stripPoint)
             check("click on the strip expands the Quota", quotaStore.isExpanded)
-            await shoot("02-expanded-by-click")
+            checkCentredOnWindowButtons("expanded header", await shoot("02-expanded-by-click"))
 
             // Expanded outright, so the collapse check below cannot pass just
             // because the expand above failed.
@@ -107,7 +107,7 @@ enum UIShots {
 
             await state(size: UIShots.narrow, dark: false, expanded: false)
             checkTitleBarHit(named: "strip at 360 pt", at: stripPoint)
-            await shoot("04-narrow-collapsed")
+            checkCentredOnWindowButtons("strip at 360 pt", await shoot("04-narrow-collapsed"))
 
             await state(size: UIShots.wide, dark: true, expanded: true)
             await shoot("05-dark-expanded")
@@ -138,12 +138,13 @@ enum UIShots {
         }
 
         /// The whole window, title bar included, as the window itself draws it.
-        private func shoot(_ name: String) async {
+        @discardableResult
+        private func shoot(_ name: String) async -> NSBitmapImageRep? {
             await pause()
             guard let frame = window.contentView?.superview,
                   let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else {
                 fail("\(name): nothing to draw")
-                return
+                return nil
             }
             frame.cacheDisplay(in: frame.bounds, to: rep)
             let url = directory.appendingPathComponent("\(name).png")
@@ -154,6 +155,7 @@ enum UIShots {
             } catch {
                 fail("\(name): could not write \(url.path): \(error)")
             }
+            return rep
         }
 
         private func click(_ point: NSPoint) async {
@@ -180,6 +182,49 @@ enum UIShots {
             let hit = frame.hitTest(frame.convert(point, from: nil))
             check("\(name) at \(NSStringFromPoint(point)) is hit-tested to the title bar (got \(hit.map { String(describing: type(of: $0)) } ?? "nothing"))",
                   hit?.isDescendant(of: titleBar) == true)
+        }
+
+        /// What the title bar row draws must sit on the window buttons' centre
+        /// line. Read off the picture rather than the view tree, because the
+        /// failure this guards against — the row stretched above the window's
+        /// top edge and its content drawn a few points high — is invisible to
+        /// AppKit: every frame in it is where it should be.
+        private func checkCentredOnWindowButtons(_ name: String, _ rep: NSBitmapImageRep?) {
+            guard let rep, let frame = window.contentView?.superview,
+                  let close = window.standardWindowButton(.closeButton) else {
+                fail("\(name): nothing to measure")
+                return
+            }
+            let scale = CGFloat(rep.pixelsWide) / frame.bounds.width
+            let buttons = close.convert(close.bounds, to: nil)
+            let buttonsMid = frame.bounds.height - buttons.midY
+            let bar = titleBarFrame
+            let rowBottom = Int((frame.bounds.height - bar.minY) * scale)
+            // Between the zoom button and the strip: always the bare title bar.
+            guard let ground = rep.colorAt(x: Int(72 * scale), y: Int(2 * scale)) else { return }
+            var top: Int?
+            var bottom = 0
+            for y in 0..<rowBottom {
+                for x in Int(80 * scale)..<Int((bar.maxX - Metrics.gutter + 2) * scale)
+                    where rep.colorAt(x: x, y: y).map({ Self.differs($0, ground) }) == true {
+                    if top == nil { top = y }
+                    bottom = y
+                    break
+                }
+            }
+            guard let top else {
+                fail("\(name): nothing drawn in the title bar row")
+                return
+            }
+            let mid = CGFloat(top + bottom) / 2 / scale
+            check(String(format: "%@ centred on the window buttons (%.1f pt vs %.1f pt)", name, mid, buttonsMid),
+                  abs(mid - buttonsMid) <= 1.5)
+        }
+
+        private static func differs(_ a: NSColor, _ b: NSColor) -> Bool {
+            guard let a = a.usingColorSpace(.deviceRGB), let b = b.usingColorSpace(.deviceRGB) else { return false }
+            return abs(a.redComponent - b.redComponent) + abs(a.greenComponent - b.greenComponent)
+                + abs(a.blueComponent - b.blueComponent) > 0.12
         }
 
         private func check(_ what: String, _ passed: Bool) {

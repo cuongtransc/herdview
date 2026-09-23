@@ -140,6 +140,7 @@ mise trust                     # once, so mise will load mise.toml
 mise run                       # release .app → build/Herdview.app
 mise run run                   # build and open
 mise run test                  # swift test
+mise run ui:shots              # window from fixtures → build/ui-shots/*.png, checks clicks and alignment
 mise run clean
 mise run icon --color 5C43DC   # redraw scripts/AppIcon.icns (the default accent if --color is left out)
 ```
