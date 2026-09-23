@@ -8,10 +8,9 @@ import SwiftUI
 /// `AppDelegate` refuses to terminate with it.
 ///
 /// The title bar is transparent, and the list runs the whole height of the
-/// window underneath it. The title bar's own row is the Quota's: the list reads
-/// the top safe-area inset, ignores it, and puts `QuotaTitleBar` in that row
-/// beside the window buttons — so the strip is clickable there while the empty
-/// part of the row still drags the window.
+/// window underneath it. The title bar's own row is the Quota's: the list leaves
+/// it empty, and `QuotaTitleBar` is laid over it in a hosting view of its own,
+/// beside the window buttons (see `layTitleBar`).
 ///
 /// It was an `NSToolbar` first, for the Liquid Glass a toolbar is given for
 /// free. That was the wrong trade once the window itself became glass: from
@@ -69,6 +68,7 @@ final class MainWindowController: NSObject {
         window.isReleasedWhenClosed = false
         window.contentViewController = Self.backdrop(
             around: AgentListView(store: store, quotaStore: quotaStore, filter: filterState))
+        Self.layTitleBar(QuotaTitleBar(store: quotaStore), over: window)
         // The window has to stop painting its own opaque grey before anything
         // behind it can show through the backdrop.
         window.isOpaque = false
@@ -171,6 +171,28 @@ final class MainWindowController: NSObject {
     /// almost always the inactive one; letting it fall back to flat grey the
     /// moment it loses focus would mean it is grey exactly whenever it is being
     /// used.
+    /// Lays `content` over the title bar's row, in a hosting view added after
+    /// the list's so AppKit hit-tests it first. The list's `ScrollView` is an
+    /// `NSScrollView` stretched over the whole window, title bar row included,
+    /// and anything drawn inside the list's own hosting view there is behind it.
+    ///
+    /// The row runs from the window's top edge down to the content layout
+    /// guide, which is exactly the title bar's height, and follows it if AppKit
+    /// ever changes it.
+    private static func layTitleBar<Content: View>(_ content: Content, over window: NSWindow) {
+        guard let backdrop = window.contentView,
+              let guide = window.contentLayoutGuide as? NSLayoutGuide else { return }
+        let hosting = NSHostingView(rootView: content)
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        backdrop.addSubview(hosting)
+        NSLayoutConstraint.activate([
+            hosting.leadingAnchor.constraint(equalTo: backdrop.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: backdrop.trailingAnchor),
+            hosting.topAnchor.constraint(equalTo: backdrop.topAnchor),
+            hosting.bottomAnchor.constraint(equalTo: guide.topAnchor),
+        ])
+    }
+
     private static func backdrop<Content: View>(around content: Content) -> NSViewController {
         let hosting = NSHostingView(rootView: content)
         hosting.translatesAutoresizingMaskIntoConstraints = false

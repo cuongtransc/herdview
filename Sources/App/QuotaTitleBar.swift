@@ -8,46 +8,51 @@ import HerdviewCore
 /// (`QuotaFormat.titleBarWindows`), and a chevron that says there is more. It
 /// answers "can I keep going" in the one row of the window that was empty.
 ///
-/// Clicking the strip swaps it for a header in the same row and puts the full
-/// per-Window list in a panel below it. The panel is a sibling of the list's
-/// `ScrollView`, not part of it, so expanding pushes the filter and the herd
-/// down instead of covering them.
+/// Clicking the strip swaps it for a header in the same row, and the list puts
+/// `QuotaPanel` — every Window — below the row, above the filter.
+///
+/// This view is hosted on its own, in an `NSHostingView` laid over the title
+/// bar row by `MainWindowController`, not inside the list. The list's
+/// `ScrollView` is backed by an `NSScrollView` that SwiftUI stretches over the
+/// whole window, title bar row included; AppKit hit-tests that scroll view
+/// before any SwiftUI content drawn in the same hosting view, so a strip drawn
+/// by the list could be seen but never clicked. A hosting view of its own, above
+/// the list's, is first in AppKit's hit-testing order.
 struct QuotaTitleBar: View {
     /// Where the strip's content starts so that it clears the window buttons.
     /// AppKit lays those out in the title bar's leading corner and SwiftUI
     /// cannot see them, so this is a measured constant: on a standard window the
     /// zoom button's trailing edge is at 69 pt, and 78 leaves it a gap.
     private static let trafficLightInset: CGFloat = 78
+    /// The strip's pace colours and tooltips move on the scale of minutes; a
+    /// second is plenty and keeps this row off the list's half-second clock.
+    private static let tick: TimeInterval = 1
 
     @ObservedObject var store: QuotaStore
-    let now: Date
-    /// The title bar's own height, measured by the list from the window's top
-    /// safe-area inset before it ignores that inset.
-    let titleBarHeight: CGFloat
 
     var body: some View {
-        VStack(spacing: 0) {
-            titleBarRow
-            if store.isExpanded {
-                panel
-            }
+        TimelineView(.periodic(from: .now, by: Self.tick)) { context in
+            row(now: context.date)
         }
+        // This hosting view *is* the title bar's row, so the title bar's safe
+        // area is the whole of it; honouring that inset would push the strip
+        // down out of the row it exists to sit in.
+        .ignoresSafeArea()
     }
 
     /// The title bar's row: the collapsed strip or the expanded header, never
     /// both. Either is trailing-aligned, so the control stays where the eye left
-    /// it when it swaps, and the empty part of the row is still the window's to
-    /// drag.
-    private var titleBarRow: some View {
+    /// it when it swaps.
+    private func row(now: Date) -> some View {
         HStack(spacing: 6) {
             Spacer(minLength: 0)
             if store.isExpanded {
-                expandedHeader
+                expandedHeader(now: now)
             } else {
-                collapsedStrip
+                collapsedStrip(now: now)
             }
         }
-        .frame(height: titleBarHeight)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.leading, Self.trafficLightInset)
         .padding(.trailing, Metrics.gutter)
     }
@@ -56,7 +61,7 @@ struct QuotaTitleBar: View {
 
     /// The whole strip is one button: the gauges are a summary, not controls, so
     /// a click anywhere on them means the same thing.
-    private var collapsedStrip: some View {
+    private func collapsedStrip(now: Date) -> some View {
         Button {
             setExpanded(true)
         } label: {
@@ -64,15 +69,18 @@ struct QuotaTitleBar: View {
             // longer fit beside the traffic lights, and dropping them whole keeps
             // every bar's length readable where truncating the text would not.
             ViewThatFits(in: .horizontal) {
-                strip(showPercent: true)
-                strip(showPercent: false)
+                strip(showPercent: true, now: now)
+                strip(showPercent: false, now: now)
             }
         }
         .buttonStyle(.plain)
+        // Not a keyboard stop: as the first focusable view in the window it
+        // took focus at launch and wore a focus ring the design does not have.
+        .focusable(false)
         .help("Show every Window")
     }
 
-    private func strip(showPercent: Bool) -> some View {
+    private func strip(showPercent: Bool, now: Date) -> some View {
         HStack(spacing: 10) {
             ForEach(store.providers, id: \.self) { provider in
                 QuotaMiniGauge(provider: provider,
@@ -96,7 +104,7 @@ struct QuotaTitleBar: View {
     /// button, which sits between two collapse buttons rather than inside one: a
     /// button inside a button would leave the refresh's own clicks to whichever
     /// one SwiftUI happened to hit first.
-    private var expandedHeader: some View {
+    private func expandedHeader(now: Date) -> some View {
         HStack(spacing: 8) {
             Button {
                 setExpanded(false)
@@ -112,6 +120,7 @@ struct QuotaTitleBar: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusable(false)
             .help("Show only the short and weekly Windows")
 
             refreshButton
@@ -125,6 +134,7 @@ struct QuotaTitleBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusable(false)
             .help("Show only the short and weekly Windows")
         }
         .font(.system(size: 11, weight: .semibold))
@@ -144,6 +154,7 @@ struct QuotaTitleBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusable(false)
             .help("Refresh Quota now")
         } else {
             ProgressView()
@@ -155,20 +166,25 @@ struct QuotaTitleBar: View {
         }
     }
 
-    /// The full list, pinned below the title bar row and above the filter: it is
-    /// a sibling of the list's `ScrollView`, so it never scrolls away and never
-    /// covers what is under it.
-    private var panel: some View {
-        QuotaRows(store: store, now: now)
-            .cardSurface()
-            .padding(.horizontal, Metrics.gutter)
-            .padding(.bottom, Metrics.groupGap / 2)
-    }
-
     /// One animation for the swap, so the panel and the header it came with move
     /// together rather than snapping in two steps.
     private func setExpanded(_ expanded: Bool) {
         withAnimation(.easeInOut(duration: 0.18)) { store.isExpanded = expanded }
+    }
+}
+
+/// The full list, pinned below the title bar row and above the filter: the
+/// list puts it outside its `ScrollView`, so it never scrolls away and never
+/// covers what is under it.
+struct QuotaPanel: View {
+    @ObservedObject var store: QuotaStore
+    let now: Date
+
+    var body: some View {
+        QuotaRows(store: store, now: now)
+            .cardSurface()
+            .padding(.horizontal, Metrics.gutter)
+            .padding(.bottom, Metrics.groupGap / 2)
     }
 }
 

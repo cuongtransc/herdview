@@ -66,9 +66,13 @@ struct AgentListView: View {
                 // so expanding pushes the filter and the herd down rather than
                 // covering them.
                 VStack(spacing: 0) {
-                    QuotaTitleBar(store: quotaStore,
-                                  now: context.date,
-                                  titleBarHeight: titleBarHeight)
+                    // The row itself is left empty here: `QuotaTitleBar` is laid
+                    // over it in a hosting view of its own, which is the only way
+                    // its clicks get past this list's scroll view (see there).
+                    Color.clear.frame(height: titleBarHeight)
+                    if quotaStore.isExpanded {
+                        QuotaPanel(store: quotaStore, now: context.date)
+                    }
                     ScrollView {
                         // Host groups are separated by air rather than by a rule:
                         // the card edge already says where one host ends.
