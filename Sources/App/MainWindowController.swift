@@ -29,6 +29,7 @@ final class MainWindowController: NSObject {
     private let store: AgentStore
     private let preferences: WindowPreferences
     private let keepOnTopItem: NSMenuItem?
+    private let filterState: FilterState
     private var reportedVisible = false
 
     /// Visibility hooks keep Quota work aligned with AppKit, including actions
@@ -39,10 +40,16 @@ final class MainWindowController: NSObject {
     init(store: AgentStore,
          quotaStore: QuotaStore,
          preferences: WindowPreferences = WindowPreferences(),
-         keepOnTopItem: NSMenuItem? = nil) {
+         keepOnTopItem: NSMenuItem? = nil,
+         findItem: NSMenuItem? = nil) {
         self.store = store
         self.preferences = preferences
         self.keepOnTopItem = keepOnTopItem
+        // Built as a local before it is stored, because a stored property of
+        // `self` cannot be read until every one of them is initialized — and
+        // the list below is handed the very state this controller keeps.
+        let filterState = FilterState(preferences: preferences)
+        self.filterState = filterState
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 480),
             // `.fullSizeContentView` hands the title bar's own strip of the
@@ -58,7 +65,8 @@ final class MainWindowController: NSObject {
         window.titleVisibility = .hidden
         window.contentMinSize = NSSize(width: 360, height: 240)
         window.isReleasedWhenClosed = false
-        window.contentViewController = Self.backdrop(around: AgentListView(store: store, quotaStore: quotaStore))
+        window.contentViewController = Self.backdrop(
+            around: AgentListView(store: store, quotaStore: quotaStore, filter: filterState))
         // The window has to stop painting its own opaque grey before anything
         // behind it can show through the backdrop.
         window.isOpaque = false
@@ -78,6 +86,9 @@ final class MainWindowController: NSObject {
         keepOnTopItem?.target = self
         keepOnTopItem?.action = #selector(toggleAlwaysOnTop)
         applyAlwaysOnTop(preferences.isAlwaysOnTop)
+
+        findItem?.target = self
+        findItem?.action = #selector(find)
     }
 
     var isVisible: Bool { window.isVisible && !window.isMiniaturized }
@@ -112,6 +123,15 @@ final class MainWindowController: NSObject {
         guard reportedVisible else { return }
         reportedVisible = false
         onHide?()
+    }
+
+    /// The Edit menu's `Find…`: bring the window forward and put the caret in
+    /// the search field. The menu item is the only thing that knows ⌘F was
+    /// pressed and the field is the only thing that can act on it, so the two
+    /// are joined through the state's focus counter rather than directly.
+    @objc func find() {
+        show()
+        filterState.requestFocus()
     }
 
     /// The Window menu's `Keep on Top`: float above other apps, or stop.

@@ -26,6 +26,7 @@ struct AgentListView: View {
 
     @ObservedObject var store: AgentStore
     @ObservedObject var quotaStore: QuotaStore
+    @ObservedObject var filter: FilterState
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: Self.tick)) { context in

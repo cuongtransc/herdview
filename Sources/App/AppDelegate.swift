@@ -40,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The monitor holds it for as long as the app runs.
         let quotaStore = QuotaStore(providers: config.watchedProviders)
 
-        let window = MainWindowController(store: store, quotaStore: quotaStore, keepOnTopItem: menuItems?.keepOnTop)
+        let window = MainWindowController(store: store, quotaStore: quotaStore,
+                                          keepOnTopItem: menuItems?.keepOnTop,
+                                          findItem: menuItems?.find)
         mainWindow = window
         window.show()
 
