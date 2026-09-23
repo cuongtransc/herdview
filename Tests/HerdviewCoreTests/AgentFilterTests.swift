@@ -113,4 +113,16 @@ final class AgentFilterTests: XCTestCase {
                       tracked(host: "b", paneId: "w2:p3")]
         XCTAssertEqual(AgentFilter().apply(to: agents).visible.map(\.host), ["c", "a", "b"])
     }
+
+    /// A narrow window falls back to these, so each must be a real shortening
+    /// that still tells the segments apart.
+    func testShortTitlesAreShorterAndStillDistinct() {
+        let short = AgentScope.allCases.map(\.shortTitle)
+        XCTAssertEqual(Set(short).count, AgentScope.allCases.count)
+        for scope in AgentScope.allCases {
+            XCTAssertFalse(scope.shortTitle.isEmpty)
+            XCTAssertLessThanOrEqual(scope.shortTitle.count, scope.title.count)
+        }
+        XCTAssertLessThan(short.joined().count, AgentScope.allCases.map(\.title).joined().count)
+    }
 }

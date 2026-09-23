@@ -22,13 +22,16 @@ struct FilterBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             searchField
-            Picker("", selection: $filter.scope) {
-                ForEach(AgentScope.allCases, id: \.self) { scope in
-                    Text("\(scope.title) \(counts[scope, default: 0])").tag(scope)
-                }
+            // A segmented control does not shrink: given less room than its
+            // labels need, it runs past the window's edge and the last segment
+            // is cut off. So it steps down until it fits — full size, then
+            // small, then small with the short labels — and the counts, which
+            // are the point, survive every step.
+            ViewThatFits(in: .horizontal) {
+                scopePicker(short: false).controlSize(.regular)
+                scopePicker(short: false).controlSize(.small)
+                scopePicker(short: true).controlSize(.small)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
         }
         // ⌘F is the menu's, not this view's: the menu item is the only thing
         // that sees the shortcut and this field is the only thing that can act
@@ -38,6 +41,19 @@ struct FilterBar: View {
         // current value to every new subscriber, so without it the field would
         // seize focus the instant the window opens — before any ⌘F was pressed.
         .onReceive(filter.$focusRequest.dropFirst()) { _ in isFocused = true }
+    }
+
+    private func scopePicker(short: Bool) -> some View {
+        Picker("", selection: $filter.scope) {
+            ForEach(AgentScope.allCases, id: \.self) { scope in
+                Text("\(short ? scope.shortTitle : scope.title) \(counts[scope, default: 0])").tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        // Measured at its own width, so `ViewThatFits` sees what it needs
+        // rather than whatever it was offered.
+        .fixedSize()
     }
 
     private var searchField: some View {

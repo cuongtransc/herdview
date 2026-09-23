@@ -31,6 +31,18 @@ public enum AgentScope: String, CaseIterable, Sendable {
         case .idle: return "Idle"
         }
     }
+
+    /// The same labels cut down for a narrow window, where the full ones push
+    /// the last segment off the edge. The counts beside them stay; the words
+    /// are what give.
+    public var shortTitle: String {
+        switch self {
+        case .all: return "All"
+        case .needsMe: return "Needs"
+        case .working: return "Work"
+        case .idle: return "Idle"
+        }
+    }
 }
 
 /// The search box and status scope together. Kept as one value so the window can
