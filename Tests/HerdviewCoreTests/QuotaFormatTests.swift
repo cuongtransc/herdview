@@ -112,4 +112,52 @@ final class QuotaFormatTests: XCTestCase {
         XCTAssertEqual(QuotaFormat.summaryWindow(of: windows)?.label, "month")
         XCTAssertNil(QuotaFormat.summaryWindow(of: []))
     }
+
+    // MARK: Title bar
+
+    private func titleBarLabels(_ windows: [QuotaWindow]) -> [String] {
+        QuotaFormat.titleBarWindows(of: windows).map(\.label)
+    }
+
+    func testTitleBarShowsTheShortWindowThenThePlainWeek() {
+        let windows = [
+            QuotaWindow(label: "5h", usedPercent: 19, resetsAt: nil, duration: 18_000),
+            QuotaWindow(label: "week", usedPercent: 28, resetsAt: nil, duration: 604_800),
+            QuotaWindow(label: "week · Fable", usedPercent: 4, resetsAt: nil, duration: 604_800),
+        ]
+        XCTAssertEqual(titleBarLabels(windows), ["5h", "week"])
+    }
+
+    /// A plain `week` is the one worth the strip even when a per-model 7-day
+    /// Window comes first in the report.
+    func testTitleBarPrefersThePlainWeekWhereverItSits() {
+        let windows = [
+            QuotaWindow(label: "week · Fable", usedPercent: 4, resetsAt: nil, duration: 604_800),
+            QuotaWindow(label: "5h", usedPercent: 19, resetsAt: nil, duration: 18_000),
+            QuotaWindow(label: "week", usedPercent: 28, resetsAt: nil, duration: 604_800),
+        ]
+        XCTAssertEqual(titleBarLabels(windows), ["5h", "week"])
+    }
+
+    func testTitleBarFallsBackToTheFirstSevenDayWindow() {
+        let windows = [
+            QuotaWindow(label: "5h", usedPercent: 19, resetsAt: nil, duration: 18_000),
+            QuotaWindow(label: "week · Fable", usedPercent: 4, resetsAt: nil, duration: 604_800),
+        ]
+        XCTAssertEqual(titleBarLabels(windows), ["5h", "week · Fable"])
+    }
+
+    func testTitleBarDoesNotRepeatTheWeekAsItsOwnSummary() {
+        let windows = [QuotaWindow(label: "week", usedPercent: 28, resetsAt: nil, duration: 604_800)]
+        XCTAssertEqual(titleBarLabels(windows), ["week"])
+    }
+
+    func testTitleBarShowsAWindowWithNoLengthOnItsOwn() {
+        let windows = [QuotaWindow(label: "month", usedPercent: 50, resetsAt: nil)]
+        XCTAssertEqual(titleBarLabels(windows), ["month"])
+    }
+
+    func testTitleBarOfNoWindowsIsEmpty() {
+        XCTAssertEqual(titleBarLabels([]), [])
+    }
 }

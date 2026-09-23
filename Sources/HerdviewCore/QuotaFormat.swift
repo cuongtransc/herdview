@@ -61,6 +61,16 @@ public enum QuotaFormat {
         windows.filter { $0.duration != nil }.min { $0.duration! < $1.duration! } ?? windows.first
     }
 
+    /// The Windows the title bar strip shows for a Provider, short one first:
+    /// `summaryWindow`, then its `week` if that is a different Window. At most two.
+    public static func titleBarWindows(of windows: [QuotaWindow]) -> [QuotaWindow] {
+        guard let summary = summaryWindow(of: windows) else { return [] }
+        let week = windows.first { $0.label == "week" }
+            ?? windows.first { $0.duration == 604_800 }
+        guard let week, week != summary else { return [summary] }
+        return [summary, week]
+    }
+
     /// How old the numbers on a row with a problem are.
     public static func updatedAgo(_ fetchedAt: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(fetchedAt)))
