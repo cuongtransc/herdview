@@ -30,10 +30,34 @@ struct AgentListView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: Self.tick)) { context in
+            // Run the filter once for the whole body and read every answer off
+            // the one result — the segments, the banner, the hosts, the empty
+            // state and the footer all have to agree, and a second pass could
+            // only ever disagree with the first.
+            let result = filter.filter.apply(to: store.agents)
+            let isFiltering = filter.filter.isActive
+            // Grouping once here rather than filtering per host keeps the work
+            // proportional to the herd, not to the herd times the hosts.
+            let visibleByHost = isFiltering
+                ? Dictionary(grouping: result.visible, by: \.host)
+                : [:]
+            // A host with nothing left to show is not shown at all — a card
+            // that says "No agents here" while a filter is on would read as a
+            // fact about the host rather than about the filter. Hosts keep the
+            // store's order, and the agents within them keep theirs.
+            let hosts = isFiltering
+                ? store.hostOrder.filter { !(visibleByHost[$0] ?? []).isEmpty }
+                : store.hostOrder
             ScrollView {
                 // Host groups are separated by air rather than by a rule:
                 // the card edge already says where one host ends.
                 LazyVStack(alignment: .leading, spacing: Metrics.groupGap) {
+                    FilterBar(filter: filter, counts: result.scopeCounts)
+                    if result.hiddenAskingForAPerson > 0 {
+                        HiddenAttentionBanner(count: result.hiddenAskingForAPerson) {
+                            filter.clear()
+                        }
+                    }
                     QuotaCard(store: quotaStore, now: context.date)
                     if let error = store.configError {
                         Notice(symbol: "exclamationmark.triangle.fill", text: error, tint: .red)
@@ -46,8 +70,28 @@ struct AgentListView: View {
                             .padding(.horizontal, Metrics.textInset)
                             .cardSurface()
                     }
-                    ForEach(store.hostOrder, id: \.self) { host in
-                        HostGroup(host: host, store: store, now: context.date)
+                    // Only when there were hosts to filter: with none, the
+                    // notice above already says why the list is empty, and
+                    // "No agents match" would blame the filter for it.
+                    if isFiltering && result.visible.isEmpty && !store.hostOrder.isEmpty {
+                        Notice(symbol: "line.3.horizontal.decrease.circle",
+                               text: "No agents match")
+                            .padding(.horizontal, Metrics.textInset)
+                            .cardSurface()
+                    } else {
+                        ForEach(hosts, id: \.self) { host in
+                            HostGroup(host: host,
+                                      agents: isFiltering ? (visibleByHost[host] ?? [])
+                                                          : store.agents(forHost: host),
+                                      unreachable: store.unreachableHosts.contains(host),
+                                      now: context.date)
+                        }
+                    }
+                    if isFiltering && result.hiddenCount > 0 {
+                        FilterFooter(hiddenCount: result.hiddenCount,
+                                     hiddenHosts: result.hiddenHosts) {
+                            filter.clear()
+                        }
                     }
                 }
                 .padding(.horizontal, Metrics.gutter)
@@ -141,12 +185,15 @@ extension View {
 
 private struct HostGroup: View {
     let host: String
-    @ObservedObject var store: AgentStore
+    /// The agents this host is actually showing. Handed in rather than read
+    /// from the store, because with a filter on it is the visible subset and
+    /// not everything the host is running; the count beside the name has to be
+    /// the count on screen.
+    let agents: [TrackedAgent]
+    let unreachable: Bool
     let now: Date
 
     var body: some View {
-        let agents = store.agents(forHost: host)
-        let unreachable = store.unreachableHosts.contains(host)
         VStack(alignment: .leading, spacing: 6) {
             HostLabel(host: host, count: agents.count, unreachable: unreachable)
             VStack(alignment: .leading, spacing: 0) {
@@ -434,7 +481,9 @@ private struct StatusPill: View {
 
 /// Every state where there is nothing to list says what is true and, where
 /// there is one, what to do about it.
-private struct Notice: View {
+/// Internal rather than private so the filter bar's banner can say the same
+/// kind of thing in the same shape, instead of growing a second notice style.
+struct Notice: View {
     let symbol: String
     let text: String
     var tint: Color? = nil
