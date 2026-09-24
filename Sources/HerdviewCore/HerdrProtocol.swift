@@ -20,14 +20,28 @@ public struct AgentListResult: Decodable, Equatable, Sendable {
     }
 }
 
+/// Params of every call that names one Agent: `{"target": "<pane_id>"}`.
+public struct AgentTarget: Encodable, Equatable, Sendable {
+    public let target: String
+
+    public init(target: String) {
+        self.target = target
+    }
+}
+
+/// The result of a call that only acknowledges: `{"type":"ok"}`.
+public struct OkResult: Decodable, Equatable, Sendable {
+    public let type: String
+}
+
 /// Newline-delimited JSON codec for Herdr's socket protocol.
 public enum HerdrProtocol {
     private struct EmptyParams: Encodable {}
 
-    private struct Request: Encodable {
+    private struct Request<P: Encodable>: Encodable {
         let id: String
         let method: String
-        let params: EmptyParams
+        let params: P
     }
 
     private struct Envelope<R: Decodable>: Decodable {
@@ -38,7 +52,12 @@ public enum HerdrProtocol {
 
     /// One request line, newline terminated, with empty `params`.
     public static func requestLine(id: String, method: String) throws -> Data {
-        var data = try JSONEncoder().encode(Request(id: id, method: method, params: EmptyParams()))
+        try requestLine(id: id, method: method, params: EmptyParams())
+    }
+
+    /// One request line, newline terminated.
+    public static func requestLine<P: Encodable>(id: String, method: String, params: P) throws -> Data {
+        var data = try JSONEncoder().encode(Request(id: id, method: method, params: params))
         data.append(0x0A)
         return data
     }
