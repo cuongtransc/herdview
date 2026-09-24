@@ -98,14 +98,16 @@ diagnosing, the row is for glancing.
 
 ## Model
 
-- `QuotaSource`: `claude`, `codex`, `opencode`, `grok`, `pi`; a display name and its
-  sign-in command.
-- `QuotaCredential` gains `source: QuotaSource` and `expiresAt: Date?`.
-- `QuotaAccount { provider, id, sources: [QuotaSource] }` — `Hashable` on
-  `provider + id`.
-- `QuotaAccounts.group([QuotaCredential]) -> [(QuotaAccount, QuotaCredential)]` — pure,
-  in `HerdviewCore`, applies the identity and choice rules above. Accounts come out in
-  Source order of their first Source, so rows do not jump between polls.
+- `QuotaSource`: `claude`, `codex`, `opencode`, `grok`, `pi`; its raw value is the only
+  thing about a credential Herdview shows.
+- `QuotaCredential(token:accountId:)` is unchanged: a credential carries no Source of its
+  own, so the Source travels beside it as a `(source:credential:)` pair.
+- `QuotaAccountKey { provider, id }` — `Hashable` on `provider + id`.
+- `QuotaAccount { key, sources: [QuotaSource] }`, `provider` read through `key`.
+- `QuotaAccounts.group([(source: QuotaSource, credential: QuotaCredential)], provider:) ->
+  [(account: QuotaAccount, credential: QuotaCredential)]` — pure, in `HerdviewCore`,
+  applies the identity and choice rules above. Accounts come out in Source order of their
+  first Source, so rows do not jump between polls.
 
 ## Flow
 
@@ -117,9 +119,13 @@ Each poll, per visible Provider:
 4. Otherwise one fetch per Account; each result updates that Account's entry.
    Accounts no longer found are dropped from the store.
 
-Scheduling, rate-limit waits and cancellation move from per-Provider to per-Account
-keys; their rules do not change. A rate limit on one Account does not hold back
-another.
+Scheduling and cancellation stay per Provider: one fetch reads every Source, then asks
+for each Account in turn. Rate-limit waits move to per-Account keys, so a rate limit on
+one Account does not hold back another; a Provider is skipped only while every one of
+its Accounts is waiting.
+
+Expiry comes from the token itself (JWT `exp`), for every Source alike; pi's
+`xai.expires` is not read.
 
 ## UI
 
@@ -133,8 +139,8 @@ another.
 
 TDD in `HerdviewCoreTests`:
 
-- pi `auth.json` parsing: `opencode-go` api key; `xai` oauth with `expires` ms; missing
-  entries; wrong `type`; malformed JSON.
+- pi `auth.json` parsing: `opencode-go` api key; `xai` oauth whose `access` is a JWT;
+  missing entries; wrong `type`; malformed JSON.
 - Identity: account id beats `sub` beats hash; a non-JWT token falls to the hash.
 - Grouping: same `sub` from two Sources → one Account with both Sources; two different
   keys → two Accounts; latest expiry wins; no expiry loses; tie → Source order.
