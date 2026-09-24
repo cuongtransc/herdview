@@ -50,8 +50,8 @@ enum UIShots {
             store.apply(host: parts[0], session: parts[1], snapshot: agents.map(\.info), now: now)
         }
         let quotaStore = QuotaStore(providers: QuotaProvider.allCases, preferences: preferences)
-        for (provider, entry) in UIShotFixtures.quota(now: now) {
-            quotaStore.set(entry, for: provider)
+        for row in UIShotFixtures.quota(now: now).rows {
+            quotaStore.set(row.entry, for: row.provider)
         }
 
         let controller = MainWindowController(store: store, quotaStore: quotaStore, preferences: preferences,
