@@ -78,9 +78,10 @@ struct QuotaTitleBar: View {
 
     private func strip(showPercent: Bool, now: Date) -> some View {
         HStack(spacing: 10) {
-            ForEach(store.providers, id: \.self) { provider in
-                QuotaMiniGauge(provider: provider,
-                               entry: store.entry(for: provider),
+            ForEach(store.rows) { row in
+                QuotaMiniGauge(provider: row.provider,
+                               title: row.title,
+                               entry: row.entry,
                                now: now,
                                showPercent: showPercent)
             }
@@ -107,7 +108,7 @@ struct QuotaTitleBar: View {
             } label: {
                 HStack(spacing: 4) {
                     Text("Quota")
-                    if let updated = QuotaFormat.lastUpdated(store.providers.map(store.entry(for:))) {
+                    if let updated = QuotaFormat.lastUpdated(store.rows.map(\.entry)) {
                         Text("· \(QuotaFormat.updatedAgo(updated, now: now))")
                             .fontWeight(.regular)
                             .foregroundStyle(.tertiary)
@@ -194,9 +195,14 @@ private struct QuotaMiniGauge: View {
     private static let barWidth: CGFloat = 30
     private static let barHeight: CGFloat = 4
     private static let iconSide: CGFloat = 18
-    private static let percentWidth: CGFloat = 24
+    /// Wide enough for a three-digit percent in the heavier warning weight:
+    /// `100%` measures 27.32 pt regular and 28.73 pt semibold at this font, and
+    /// a full Window is a warning, so the column takes the semibold width. The
+    /// frame rounds it up the way the panel's does.
+    private static let percentWidth: CGFloat = 29
 
     let provider: QuotaProvider
+    let title: String
     let entry: QuotaEntry
     let now: Date
     let showPercent: Bool
@@ -243,6 +249,7 @@ private struct QuotaMiniGauge: View {
                     .font(.system(size: 9.5).monospacedDigit())
                     .fontWeight(warning ? .semibold : .regular)
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
                     .frame(width: Self.percentWidth, alignment: .leading)
             }
         }
@@ -253,11 +260,11 @@ private struct QuotaMiniGauge: View {
     private var help: String {
         switch entry {
         case .loading:
-            return provider.displayName
+            return title
         case .notSignedIn:
-            return "\(provider.displayName): not signed in"
+            return "\(title): not signed in"
         case .problem(let problem, _):
-            return "\(provider.displayName): \(problem.message(for: provider))"
+            return "\(title): \(problem.message)"
         case .ok(let report):
             let parts = QuotaFormat.titleBarWindows(of: report.windows).map { window -> String in
                 var text = "\(window.label) \(QuotaFormat.percent(window.usedPercent))"
@@ -266,7 +273,7 @@ private struct QuotaMiniGauge: View {
                 }
                 return text
             }
-            return "\(provider.displayName): \(parts.joined(separator: ", "))"
+            return "\(title): \(parts.joined(separator: ", "))"
         }
     }
 }

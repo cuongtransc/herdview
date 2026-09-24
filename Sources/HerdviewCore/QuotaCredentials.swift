@@ -15,14 +15,15 @@ public struct QuotaCredential: Equatable, Sendable {
 /// Reads the credential each CLI already stores. Read-only: Herdview never
 /// refreshes or writes one back (ADR 0005). `nil` means not signed in.
 public enum QuotaCredentials {
-    /// Where the credential file lives, relative to the home directory, or
-    /// `nil` for Claude, whose credential is in the Keychain.
-    public static func filePath(for provider: QuotaProvider, home: String) -> String? {
-        switch provider {
+    /// Where `source` keeps its credentials, or `nil` for Claude, whose
+    /// credential is in the Keychain.
+    public static func filePath(for source: QuotaSource, home: String) -> String? {
+        switch source {
         case .claude: return nil
         case .codex: return home + "/.codex/auth.json"
-        case .opencodeGo: return home + "/.local/share/opencode/auth.json"
+        case .opencode: return home + "/.local/share/opencode/auth.json"
         case .grok: return home + "/.grok/auth.json"
+        case .pi: return home + "/.pi/agent/auth.json"
         }
     }
 
@@ -43,6 +44,29 @@ public enum QuotaCredentials {
             return credential(token: entry?["key"], accountId: nil)
         case .grok:
             return grok(json)
+        }
+    }
+
+    /// The credential `source` holds for `provider`. Every Source but pi is a
+    /// Provider's own CLI and keeps the format `parse(_:_:)` reads; pi keeps
+    /// several Providers in one file, each under its own key and type.
+    public static func parse(_ provider: QuotaProvider, from source: QuotaSource, _ data: Data) -> QuotaCredential? {
+        guard source == .pi else { return parse(provider, data) }
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        switch provider {
+        case .opencodeGo:
+            guard let entry = json["opencode-go"] as? [String: Any],
+                  entry["type"] as? String == "api_key" else { return nil }
+            return credential(token: entry["key"], accountId: nil)
+        case .grok:
+            // pi keeps no user id. The token's subject is the id Grok's CLI
+            // stores, and the billing endpoint wants it as `x-userid`.
+            guard let entry = json["xai"] as? [String: Any],
+                  entry["type"] as? String == "oauth",
+                  let token = entry["access"] as? String else { return nil }
+            return credential(token: token, accountId: JWTClaims.subject(of: token))
+        case .claude, .codex:
+            return nil
         }
     }
 

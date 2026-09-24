@@ -2,15 +2,15 @@ import SwiftUI
 import HerdviewCore
 
 /// Every Window of every Provider: the panel the title bar's strip expands
-/// into. One block per Provider the store lists, separated by a hairline that
-/// starts where the text does.
+/// into. One block per row the store lists — a Provider, or each of its
+/// Accounts — separated by a hairline that starts where the text does.
 struct QuotaRows: View {
     @ObservedObject var store: QuotaStore
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(store.providers.enumerated()), id: \.element) { index, provider in
+            ForEach(Array(store.rows.enumerated()), id: \.element.id) { index, row in
                 if index > 0 {
                     Rectangle()
                         .fill(Color.primary.opacity(0.08))
@@ -18,7 +18,7 @@ struct QuotaRows: View {
                         .frame(height: 1)
                         .padding(.leading, Metrics.cardInset + QuotaRow.textLeading)
                 }
-                QuotaRow(provider: provider, entry: store.entry(for: provider), now: now)
+                QuotaRow(provider: row.provider, title: row.title, entry: row.entry, now: now)
                     .padding(.horizontal, Metrics.cardInset)
             }
         }
@@ -39,6 +39,7 @@ struct QuotaRow: View {
     private static let rowInset: CGFloat = 8
 
     let provider: QuotaProvider
+    let title: String
     let entry: QuotaEntry
     let now: Date
 
@@ -46,7 +47,7 @@ struct QuotaRow: View {
         HStack(alignment: .top, spacing: Self.iconGap) {
             ProviderIcon(provider: provider, side: Self.iconSide)
             VStack(alignment: .leading, spacing: 5) {
-                Text(provider.displayName)
+                Text(title)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 content
@@ -68,9 +69,9 @@ struct QuotaRow: View {
         case .problem(let problem, let last):
             if let last {
                 lines(last.windows, dimmed: true)
-                note("\(problem.message(for: provider)) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
+                note("\(problem.message) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
             } else {
-                note(problem.message(for: provider))
+                note(problem.message)
             }
         }
     }
@@ -125,7 +126,11 @@ struct ProviderIcon: View {
 struct WindowLine: View {
     /// Wide enough for `week · Fable`, the longest label a Provider sends.
     private static let labelWidth: CGFloat = 74
-    private static let percentWidth: CGFloat = 30
+    /// Wide enough for a three-digit percent in the heavier warning weight:
+    /// `100%` measures 31.22 pt regular and 32.86 pt semibold at this font, and
+    /// a full Window is a warning (at `warningPercent`), so the column takes
+    /// the semibold width. Truncation, never wrapping, if a wider value comes.
+    private static let percentWidth: CGFloat = 33
     private static let resetWidth: CGFloat = 44
 
     let window: QuotaWindow
@@ -143,6 +148,7 @@ struct WindowLine: View {
             Text(QuotaFormat.percent(window.usedPercent))
                 .fontWeight(warning ? .semibold : .regular)
                 .foregroundStyle(.primary)
+                .lineLimit(1)
                 .frame(width: Self.percentWidth, alignment: .trailing)
             Text(QuotaFormat.untilReset(window.resetsAt, now: now) ?? "")
                 .foregroundStyle(.secondary)

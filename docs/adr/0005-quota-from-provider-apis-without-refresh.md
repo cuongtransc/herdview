@@ -51,3 +51,13 @@ rather than wrong numbers.
 | Drive the CLIs (`codex app-server`, `claude` PTY `/usage`) | A process per poll, screen parsing tied to CLI releases, and nothing equivalent for Grok or OpenCode. Orca itself disables the Claude PTY for the user's own login. |
 | HTTP, with `codex app-server` as the Codex fallback | Codex tokens last 10 days; a second mechanism for one Provider buys almost nothing. |
 | OpenCode Go through a pasted dashboard cookie, as orca does | OpenCode has a usage endpoint that takes the Go key the CLI already stores, so no secret needs entering or storing. |
+
+## Updates
+
+### 2026-09-24: Expired reads as "quiet", and a second Source can cover it
+
+The decision stands. An expired credential is now shown as `quiet · updated <age>` with
+no "run `<cli>`": nothing needs doing, as the Consequences above already argue. And
+[0006](0006-quota-per-account-from-every-source.md) reads pi as a second Source, so an
+Account one tool has stopped using still shows fresh numbers while another tool uses
+it — still without refreshing anything.

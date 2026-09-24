@@ -34,7 +34,8 @@ final class QuotaMonitor {
     /// the fetch that replaced it.
     private var fetchIDs: [QuotaProvider: UUID] = [:]
     private var lastStarted: [QuotaProvider: Date] = [:]
-    private var rateLimitedUntil: [QuotaProvider: Date] = [:]
+    /// Per Account: a rate limit on one Account says nothing about another.
+    private var rateLimitedUntil: [QuotaAccountKey: Date] = [:]
 
     init(store: QuotaStore, isWindowVisible: @escaping () -> Bool) {
         self.store = store
@@ -119,7 +120,7 @@ final class QuotaMonitor {
         // an account for, so there is no credential to read and nothing to ask.
         for provider in store.providers where fetches[provider] == nil {
             guard QuotaSchedule.isDue(trigger, lastStarted: lastStarted[provider],
-                                      rateLimitedUntil: rateLimitedUntil[provider], now: now) else { continue }
+                                      rateLimitedUntil: waitUntil(provider), now: now) else { continue }
             lastStarted[provider] = now
             let id = UUID()
             fetchIDs[provider] = id
@@ -129,6 +130,14 @@ final class QuotaMonitor {
                 await self?.fetch(provider)
             }
         }
+    }
+
+    /// When every Account the Provider has is waiting out a rate limit, the
+    /// earliest of those; otherwise `nil`, so the others still get fetched.
+    private func waitUntil(_ provider: QuotaProvider) -> Date? {
+        let limits = store.accounts(of: provider).map { rateLimitedUntil[$0.key] }
+        guard !limits.isEmpty, !limits.contains(where: { $0 == nil }) else { return nil }
+        return limits.compactMap { $0 }.min()
     }
 
     /// Clears a finished fetch, but only if it is still the one tracking this
@@ -142,41 +151,67 @@ final class QuotaMonitor {
     }
 
     private func fetch(_ provider: QuotaProvider) async {
-        let lookup = await CredentialReader.read(provider)
-        guard canContinueFetch else { return }
+        var found: [(source: QuotaSource, credential: QuotaCredential)] = []
+        var failure: String?
+        for source in QuotaSource.sources(for: provider) {
+            let lookup = await CredentialReader.read(provider, from: source)
+            guard canContinueFetch else { return }
+            switch lookup {
+            case .found(let credential): found.append((source: source, credential: credential))
+            case .notSignedIn: break
+            case .failed(let reason): failure = failure ?? reason
+            }
+        }
+        let accounts = QuotaAccounts.group(found, provider: provider)
 
-        let outcome: QuotaOutcome
-        switch lookup {
-        case .notSignedIn:
+        if accounts.isEmpty {
             // Visibility can change without cancellation (for example an AppKit
             // order-out notification arriving after the window flag changed).
             guard canContinueFetch else { return }
-            store.set(.notSignedIn, for: provider)
+            guard let failure else {
+                store.setProviderEntry(.notSignedIn, for: provider)
+                return
+            }
+            NSLog("herdview: quota %@: failed: %@", provider.rawValue, failure)
+            let known = store.accounts(of: provider)
+            guard !known.isEmpty else {
+                store.setProviderEntry(.problem(.failed(failure), last: nil), for: provider)
+                return
+            }
+            // A Source that could not be read says nothing about the Accounts
+            // it held before, so their last numbers stay, dimmed.
+            for account in known {
+                let entry = store.entry(for: account.key).applying(.failed(failure), provider: provider, now: Date())
+                store.set(entry, for: account.key)
+            }
             return
-        case .failed(let reason):
-            outcome = .failed(reason)
-        case .found(let credential):
-            // Recheck immediately before the network boundary. A credential
-            // read that started while visible may finish after an order-out.
+        }
+        guard canContinueFetch else { return }
+        store.setAccounts(accounts.map(\.account), for: provider)
+
+        for (account, credential) in accounts {
+            let key = account.key
+            if let until = rateLimitedUntil[key], Date() < until { continue }
+            // Recheck immediately before the network boundary.
             guard canContinueFetch else { return }
             // `nil` means hidden/stopped/cancelled, not a Provider failure.
-            guard let result = await request(provider, credential) else { return }
-            outcome = result
-        }
+            guard let outcome = await request(provider, credential) else { return }
 
-        // Keep each externally visible side effect independently gated. There
-        // is no suspension between these checks on the main actor, and the
-        // visibility closure also catches order-out before its callback runs.
-        if case .rateLimited(let until) = outcome {
+            // Keep each externally visible side effect independently gated. There
+            // is no suspension between these checks on the main actor, and the
+            // visibility closure also catches order-out before its callback runs.
+            if case .rateLimited(let until) = outcome {
+                guard canContinueFetch else { return }
+                rateLimitedUntil[key] = until
+            }
             guard canContinueFetch else { return }
-            rateLimitedUntil[provider] = until
+            NSLog("herdview: quota %@ via %@: %@", provider.rawValue,
+                  account.sources.map(\.rawValue).joined(separator: ","), outcome.logDescription)
+            guard canContinueFetch else { return }
+            let entry = store.entry(for: key).applying(outcome, provider: provider, now: Date())
+            guard canContinueFetch else { return }
+            store.set(entry, for: key)
         }
-        guard canContinueFetch else { return }
-        NSLog("herdview: quota %@: %@", provider.rawValue, outcome.logDescription)
-        guard canContinueFetch else { return }
-        let entry = store.entry(for: provider).applying(outcome, provider: provider, now: Date())
-        guard canContinueFetch else { return }
-        store.set(entry, for: provider)
     }
 
     private var canContinueFetch: Bool {

@@ -55,7 +55,51 @@ final class QuotaCredentialsTests: XCTestCase {
     func testFilePaths() {
         XCTAssertNil(QuotaCredentials.filePath(for: .claude, home: "/Users/me"))
         XCTAssertEqual(QuotaCredentials.filePath(for: .codex, home: "/Users/me"), "/Users/me/.codex/auth.json")
-        XCTAssertEqual(QuotaCredentials.filePath(for: .opencodeGo, home: "/Users/me"), "/Users/me/.local/share/opencode/auth.json")
+        XCTAssertEqual(QuotaCredentials.filePath(for: .opencode, home: "/Users/me"), "/Users/me/.local/share/opencode/auth.json")
         XCTAssertEqual(QuotaCredentials.filePath(for: .grok, home: "/Users/me"), "/Users/me/.grok/auth.json")
+        XCTAssertEqual(QuotaCredentials.filePath(for: .pi, home: "/Users/me"), "/Users/me/.pi/agent/auth.json")
+    }
+
+    func testSourcesPerProviderOwnCLIFirst() {
+        XCTAssertEqual(QuotaSource.sources(for: .claude), [.claude])
+        XCTAssertEqual(QuotaSource.sources(for: .codex), [.codex])
+        XCTAssertEqual(QuotaSource.sources(for: .opencodeGo), [.opencode, .pi])
+        XCTAssertEqual(QuotaSource.sources(for: .grok), [.grok, .pi])
+    }
+
+    /// Every Source but pi holds only its own Provider, in the format it always had.
+    func testNonPiSourcesReadAsBefore() {
+        let json = Data(#"{"opencode-go":{"type":"api","key":"go-key"}}"#.utf8)
+        XCTAssertEqual(QuotaCredentials.parse(.opencodeGo, from: .opencode, json), QuotaCredential(token: "go-key"))
+    }
+
+    func testPiOpenCodeGoKey() {
+        let json = Data(#"{"opencode-go":{"type":"api_key","key":"pi-go"},"xai":{"type":"oauth","access":"x"}}"#.utf8)
+        XCTAssertEqual(QuotaCredentials.parse(.opencodeGo, from: .pi, json), QuotaCredential(token: "pi-go"))
+    }
+
+    /// pi keeps no user id; the token's subject is what Grok's CLI stores as `user_id`.
+    func testPiGrokTokenCarriesItsSubjectAsTheUserId() {
+        let token = jwt(["sub": "u1", "exp": 1_790_261_909])
+        let json = Data(#"{"xai":{"type":"oauth","access":"\#(token)","refresh":"r","expires":1790261909000}}"#.utf8)
+        XCTAssertEqual(QuotaCredentials.parse(.grok, from: .pi, json), QuotaCredential(token: token, accountId: "u1"))
+    }
+
+    func testPiWithoutTheEntryOrWithTheWrongTypeHasNothing() {
+        let other = Data(#"{"anthropic":{"type":"oauth","access":"a"}}"#.utf8)
+        XCTAssertNil(QuotaCredentials.parse(.opencodeGo, from: .pi, other))
+        XCTAssertNil(QuotaCredentials.parse(.grok, from: .pi, other))
+        let wrongType = Data(#"{"opencode-go":{"type":"oauth","key":"k"},"xai":{"type":"api_key","access":"a"}}"#.utf8)
+        XCTAssertNil(QuotaCredentials.parse(.opencodeGo, from: .pi, wrongType))
+        XCTAssertNil(QuotaCredentials.parse(.grok, from: .pi, wrongType))
+        XCTAssertNil(QuotaCredentials.parse(.opencodeGo, from: .pi, Data("not json".utf8)))
+        XCTAssertNil(QuotaCredentials.parse(.grok, from: .pi, Data(#"{"xai":{"type":"oauth","access":""}}"#.utf8)))
+    }
+
+    /// pi is not a Source for Claude or Codex, whatever its file holds.
+    func testPiHoldsNoClaudeOrCodex() {
+        let json = Data(#"{"claudeAiOauth":{"accessToken":"t"},"tokens":{"access_token":"t"}}"#.utf8)
+        XCTAssertNil(QuotaCredentials.parse(.claude, from: .pi, json))
+        XCTAssertNil(QuotaCredentials.parse(.codex, from: .pi, json))
     }
 }

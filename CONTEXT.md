@@ -53,13 +53,22 @@ The moment Herdview observed an Agent's current Status. Herdr does not report ti
 so timers count from observation, not from the real change.
 
 **Provider**:
-An account one coding agent CLI is signed in to on this Mac: Claude, Codex, OpenCode Go,
-or Grok. A Provider belongs to no Host; Agents on every Host spend the same Provider's
-Quota.
-_Avoid_: Account, vendor, service
+A service that sells a plan with Quota: Claude, Codex, OpenCode Go, or Grok. A Provider
+belongs to no Host; Agents on every Host spend its Accounts' Quota.
+_Avoid_: Vendor, service
+
+**Account**:
+One sign-in to a Provider, the thing a Quota belongs to. Several Sources can hold the
+same Account; a Provider can have several Accounts on this Mac at once.
+_Avoid_: User, login, profile
+
+**Source**:
+A tool on this Mac that keeps a credential Herdview reads: `claude`, `codex`,
+`opencode`, `grok`, or `pi`. A Source is not an Agent and belongs to no Host.
+_Avoid_: CLI, auth file
 
 **Quota**:
-How much of a Provider's plan has been used, as reported by the Provider. Made of one or
+How much of an Account's plan has been used, as reported by the Provider. Made of one or
 more Windows. Herdview only reads it and never estimates it.
 _Avoid_: Usage, rate limit, credits
 

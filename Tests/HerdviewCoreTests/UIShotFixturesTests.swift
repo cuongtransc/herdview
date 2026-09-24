@@ -20,23 +20,23 @@ final class UIShotFixturesTests: XCTestCase {
     }
 
     func testEveryProviderHasAnEntry() {
-        XCTAssertEqual(Set(UIShotFixtures.quota(now: now).keys), Set(QuotaProvider.allCases))
+        XCTAssertEqual(Set(UIShotFixtures.quota(now: now).rows.map(\.provider)), Set(QuotaProvider.allCases))
     }
 
     func testTheQuotaShowsFreshStaleAndMissingNumbers() {
-        let entries = Array(UIShotFixtures.quota(now: now).values)
+        let entries = UIShotFixtures.quota(now: now).rows.map(\.entry)
         XCTAssertTrue(entries.contains { if case .ok = $0 { return true }; return false })
         XCTAssertTrue(entries.contains { if case .problem(_, let last?) = $0 { return !last.windows.isEmpty }; return false })
         XCTAssertTrue(entries.contains { $0 == .notSignedIn })
     }
 
     func testSomeProviderHasAPerModelWeekBesideItsPlainWeek() {
-        let labels = UIShotFixtures.quota(now: now).values.compactMap(\.lastReport).map { $0.windows.map(\.label) }
+        let labels = UIShotFixtures.quota(now: now).rows.compactMap(\.entry.lastReport).map { $0.windows.map(\.label) }
         XCTAssertTrue(labels.contains { $0.contains("week") && $0.contains { $0.hasPrefix("week · ") } })
     }
 
     func testSomeWindowIsAtTheWarningLevel() {
-        let used = UIShotFixtures.quota(now: now).values.compactMap(\.lastReport).flatMap(\.windows).map(\.usedPercent)
+        let used = UIShotFixtures.quota(now: now).rows.compactMap(\.entry.lastReport).flatMap(\.windows).map(\.usedPercent)
         XCTAssertTrue(used.contains { $0 >= QuotaFormat.warningPercent })
     }
 

@@ -102,24 +102,28 @@ bar until 90%. A stale note appears when a Provider's numbers are old. Clicking
 the header row again, or its chevron-up, collapses the strip, and it stays in
 whichever state you left it next launch. The ↻ refresh button sits in the
 expanded header, refreshing without collapsing, and is only visible while
-expanded. The numbers come from each CLI's own sign-in on this Mac, never from
-the remote hosts, since every host spends the same accounts:
+expanded. The numbers come from the credentials these tools keep on this Mac,
+never from the remote hosts, since every host spends the same accounts:
 
 | Provider | Credential read |
 |---|---|
 | Claude | Keychain item `Claude Code-credentials` |
 | Codex | `~/.codex/auth.json` |
-| OpenCode Go | `opencode-go` key in `~/.local/share/opencode/auth.json` |
-| Grok | `~/.grok/auth.json` |
+| OpenCode Go | `opencode-go` key in `~/.local/share/opencode/auth.json`, and in pi's `~/.pi/agent/auth.json` |
+| Grok | `~/.grok/auth.json`, and `xai` in pi's `~/.pi/agent/auth.json` |
 
 They are only read. Herdview never refreshes a token and never runs a CLI (see
-[ADR 0005](docs/adr/0005-quota-from-provider-apis-without-refresh.md)), so a
-CLI you have not used for a few hours may show
-"sign-in expired — run grok" with its last numbers dimmed; running that CLI
-once brings it back. A CLI that is not signed in shows "not signed in". Quota
+[ADR 0005](docs/adr/0005-quota-from-provider-apis-without-refresh.md)).
+Quota belongs to an account, not to a tool: when two tools hold the same
+account it is one row, and when they hold different accounts of one Provider
+each gets its own row, named by the tools that hold it — `OpenCode Go · pi`
+([ADR 0006](docs/adr/0006-quota-per-account-from-every-source.md)).
+An account no tool has used for a few hours shows its last numbers dimmed with
+"quiet · updated 3h ago": its Quota has not moved, and the next tool to run
+brings fresh numbers. A Provider no tool is signed in to shows "not signed in". Quota
 is fetched every 5 minutes, and when the window is shown, but only while the
 window is visible; the ↻ button in the expanded strip's header fetches it at
-once, unless a Provider is waiting out a rate limit. The first read of
+once, unless an account is waiting out a rate limit. The first read of
 Claude's Keychain item may ask for permission; choose Always Allow. None of
 these usage endpoints is documented, so a row that says "unreadable response"
 means a Provider changed its API.
