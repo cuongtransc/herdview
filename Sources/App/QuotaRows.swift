@@ -68,9 +68,9 @@ struct QuotaRow: View {
         case .problem(let problem, let last):
             if let last {
                 lines(last.windows, dimmed: true)
-                note("\(problem.message(for: provider)) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
+                note("\(problem.message) · \(QuotaFormat.updatedAgo(last.fetchedAt, now: now))")
             } else {
-                note(problem.message(for: provider))
+                note(problem.message)
             }
         }
     }

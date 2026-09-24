@@ -21,13 +21,13 @@ final class QuotaEntryTests: XCTestCase {
     /// The last numbers survive every problem that says nothing about them.
     func testProblemsKeepTheLastReport() {
         let last = QuotaReport(provider: .claude, windows: windows, fetchedAt: then)
-        XCTAssertEqual(ok.applying(.signInExpired, provider: .claude, now: now), .problem(.signInExpired, last: last))
+        XCTAssertEqual(ok.applying(.signInExpired, provider: .claude, now: now), .problem(.quiet, last: last))
         XCTAssertEqual(ok.applying(.rateLimited(until: now), provider: .claude, now: now), .problem(.rateLimited, last: last))
         XCTAssertEqual(ok.applying(.failed("HTTP 500"), provider: .claude, now: now), .problem(.failed("HTTP 500"), last: last))
 
         let failedTwice = ok.applying(.failed("HTTP 500"), provider: .claude, now: now)
             .applying(.signInExpired, provider: .claude, now: now)
-        XCTAssertEqual(failedTwice, .problem(.signInExpired, last: last))
+        XCTAssertEqual(failedTwice, .problem(.quiet, last: last))
     }
 
     /// Without a subscription there is no Quota, so old numbers would be wrong.
@@ -35,12 +35,13 @@ final class QuotaEntryTests: XCTestCase {
         XCTAssertEqual(ok.applying(.noSubscription, provider: .opencodeGo, now: now), .problem(.noSubscription, last: nil))
     }
 
+    /// An expired credential asks nothing of the user: no Source has used the
+    /// Account lately, so there is nothing to do and the numbers still hold.
     func testMessages() {
-        XCTAssertEqual(QuotaProblem.signInExpired.message(for: .grok), "sign-in expired — run grok")
-        XCTAssertEqual(QuotaProblem.signInExpired.message(for: .opencodeGo), "sign-in expired — run opencode")
-        XCTAssertEqual(QuotaProblem.noSubscription.message(for: .opencodeGo), "no Go subscription")
-        XCTAssertEqual(QuotaProblem.rateLimited.message(for: .claude), "rate limited")
-        XCTAssertEqual(QuotaProblem.failed("Keychain access denied").message(for: .claude), "Keychain access denied")
+        XCTAssertEqual(QuotaProblem.quiet.message, "quiet")
+        XCTAssertEqual(QuotaProblem.noSubscription.message, "no Go subscription")
+        XCTAssertEqual(QuotaProblem.rateLimited.message, "rate limited")
+        XCTAssertEqual(QuotaProblem.failed("Keychain access denied").message, "Keychain access denied")
     }
 
     // MARK: Schedule

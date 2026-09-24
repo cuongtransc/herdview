@@ -45,7 +45,7 @@ public enum UIShotFixtures {
                 window("week", 44, resetIn: 4 * 24 * hour + 11 * hour, week),
                 window("month", 22, resetIn: 27 * 24 * hour, nil),
             ], fetchedAt: now)),
-            .grok: .problem(.signInExpired, last: QuotaReport(provider: .grok, windows: [
+            .grok: .problem(.quiet, last: QuotaReport(provider: .grok, windows: [
                 window("week", 91, resetIn: 2 * 24 * hour, week),
             ], fetchedAt: now.addingTimeInterval(-3 * hour))),
         ]

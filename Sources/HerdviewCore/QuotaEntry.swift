@@ -2,14 +2,17 @@ import Foundation
 
 /// Why a Provider's row cannot show fresh numbers.
 public enum QuotaProblem: Equatable, Sendable {
-    case signInExpired
+    /// The credential has expired because no Source has used the Account for
+    /// hours. Its Quota has not moved either, and the next Source to run
+    /// refreshes its own token, so there is nothing to ask of the user.
+    case quiet
     case noSubscription
     case rateLimited
     case failed(String)
 
-    public func message(for provider: QuotaProvider) -> String {
+    public var message: String {
         switch self {
-        case .signInExpired: return "sign-in expired — run \(provider.signInCommand)"
+        case .quiet: return "quiet"
         case .noSubscription: return "no Go subscription"
         case .rateLimited: return "rate limited"
         case .failed(let reason): return reason
@@ -41,7 +44,7 @@ public enum QuotaEntry: Equatable, Sendable {
         case .report(let windows):
             return .ok(QuotaReport(provider: provider, windows: windows, fetchedAt: now))
         case .signInExpired:
-            return .problem(.signInExpired, last: lastReport)
+            return .problem(.quiet, last: lastReport)
         case .noSubscription:
             return .problem(.noSubscription, last: nil)
         case .rateLimited:

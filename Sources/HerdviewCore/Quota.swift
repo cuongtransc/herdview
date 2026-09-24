@@ -35,17 +35,6 @@ public enum QuotaProvider: String, CaseIterable, Sendable {
         name.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
-    /// What to run to bring an expired sign-in back. Herdview never refreshes a
-    /// token itself (ADR 0005); the CLI does it the next time it runs.
-    public var signInCommand: String {
-        switch self {
-        case .claude: return "claude"
-        case .codex: return "codex"
-        case .opencodeGo: return "opencode"
-        case .grok: return "grok"
-        }
-    }
-
     /// The agent family whose icon the Quota card borrows.
     public var agentKind: AgentKind {
         switch self {

@@ -257,7 +257,7 @@ private struct QuotaMiniGauge: View {
         case .notSignedIn:
             return "\(provider.displayName): not signed in"
         case .problem(let problem, _):
-            return "\(provider.displayName): \(problem.message(for: provider))"
+            return "\(provider.displayName): \(problem.message)"
         case .ok(let report):
             let parts = QuotaFormat.titleBarWindows(of: report.windows).map { window -> String in
                 var text = "\(window.label) \(QuotaFormat.percent(window.usedPercent))"
