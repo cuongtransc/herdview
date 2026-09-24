@@ -16,10 +16,10 @@ enum CredentialReader {
     /// `security` exits with this when the item does not exist.
     private static let itemNotFound: Int32 = 44
 
-    static func read(_ provider: QuotaProvider) async -> CredentialLookup {
-        if let path = QuotaCredentials.filePath(for: QuotaSource.sources(for: provider)[0], home: NSHomeDirectory()) {
+    static func read(_ provider: QuotaProvider, from source: QuotaSource) async -> CredentialLookup {
+        if let path = QuotaCredentials.filePath(for: source, home: NSHomeDirectory()) {
             guard let data = FileManager.default.contents(atPath: path),
-                  let credential = QuotaCredentials.parse(provider, data) else { return .notSignedIn }
+                  let credential = QuotaCredentials.parse(provider, from: source, data) else { return .notSignedIn }
             return .found(credential)
         }
         return await readClaudeKeychain()

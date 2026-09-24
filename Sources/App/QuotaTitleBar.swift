@@ -78,9 +78,10 @@ struct QuotaTitleBar: View {
 
     private func strip(showPercent: Bool, now: Date) -> some View {
         HStack(spacing: 10) {
-            ForEach(store.providers, id: \.self) { provider in
-                QuotaMiniGauge(provider: provider,
-                               entry: store.entry(for: provider),
+            ForEach(store.rows) { row in
+                QuotaMiniGauge(provider: row.provider,
+                               title: row.title,
+                               entry: row.entry,
                                now: now,
                                showPercent: showPercent)
             }
@@ -107,7 +108,7 @@ struct QuotaTitleBar: View {
             } label: {
                 HStack(spacing: 4) {
                     Text("Quota")
-                    if let updated = QuotaFormat.lastUpdated(store.providers.map(store.entry(for:))) {
+                    if let updated = QuotaFormat.lastUpdated(store.rows.map(\.entry)) {
                         Text("· \(QuotaFormat.updatedAgo(updated, now: now))")
                             .fontWeight(.regular)
                             .foregroundStyle(.tertiary)
@@ -197,6 +198,7 @@ private struct QuotaMiniGauge: View {
     private static let percentWidth: CGFloat = 24
 
     let provider: QuotaProvider
+    let title: String
     let entry: QuotaEntry
     let now: Date
     let showPercent: Bool
@@ -253,11 +255,11 @@ private struct QuotaMiniGauge: View {
     private var help: String {
         switch entry {
         case .loading:
-            return provider.displayName
+            return title
         case .notSignedIn:
-            return "\(provider.displayName): not signed in"
+            return "\(title): not signed in"
         case .problem(let problem, _):
-            return "\(provider.displayName): \(problem.message)"
+            return "\(title): \(problem.message)"
         case .ok(let report):
             let parts = QuotaFormat.titleBarWindows(of: report.windows).map { window -> String in
                 var text = "\(window.label) \(QuotaFormat.percent(window.usedPercent))"
@@ -266,7 +268,7 @@ private struct QuotaMiniGauge: View {
                 }
                 return text
             }
-            return "\(provider.displayName): \(parts.joined(separator: ", "))"
+            return "\(title): \(parts.joined(separator: ", "))"
         }
     }
 }

@@ -2,15 +2,15 @@ import SwiftUI
 import HerdviewCore
 
 /// Every Window of every Provider: the panel the title bar's strip expands
-/// into. One block per Provider the store lists, separated by a hairline that
-/// starts where the text does.
+/// into. One block per row the store lists — a Provider, or each of its
+/// Accounts — separated by a hairline that starts where the text does.
 struct QuotaRows: View {
     @ObservedObject var store: QuotaStore
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(store.providers.enumerated()), id: \.element) { index, provider in
+            ForEach(Array(store.rows.enumerated()), id: \.element.id) { index, row in
                 if index > 0 {
                     Rectangle()
                         .fill(Color.primary.opacity(0.08))
@@ -18,7 +18,7 @@ struct QuotaRows: View {
                         .frame(height: 1)
                         .padding(.leading, Metrics.cardInset + QuotaRow.textLeading)
                 }
-                QuotaRow(provider: provider, entry: store.entry(for: provider), now: now)
+                QuotaRow(provider: row.provider, title: row.title, entry: row.entry, now: now)
                     .padding(.horizontal, Metrics.cardInset)
             }
         }
@@ -39,6 +39,7 @@ struct QuotaRow: View {
     private static let rowInset: CGFloat = 8
 
     let provider: QuotaProvider
+    let title: String
     let entry: QuotaEntry
     let now: Date
 
@@ -46,7 +47,7 @@ struct QuotaRow: View {
         HStack(alignment: .top, spacing: Self.iconGap) {
             ProviderIcon(provider: provider, side: Self.iconSide)
             VStack(alignment: .leading, spacing: 5) {
-                Text(provider.displayName)
+                Text(title)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 content
