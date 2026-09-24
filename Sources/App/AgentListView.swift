@@ -88,6 +88,11 @@ struct AgentListView: View {
                                     .padding(.horizontal, Metrics.textInset)
                                     .cardSurface()
                             }
+                            if let error = store.jumpError {
+                                Notice(symbol: "exclamationmark.triangle.fill", text: error, tint: .orange)
+                                    .padding(.horizontal, Metrics.textInset)
+                                    .cardSurface()
+                            }
                             if store.hostOrder.isEmpty {
                                 Notice(symbol: "server.rack",
                                        text: "No hosts yet. Add one in \(ConfigLoader.defaultPath)")
@@ -108,7 +113,8 @@ struct AgentListView: View {
                                               agents: isFiltering ? (visibleByHost[host] ?? [])
                                                                   : store.agents(forHost: host),
                                               unreachable: store.unreachableHosts.contains(host),
-                                              now: context.date)
+                                              now: context.date,
+                                              onJump: { store.jumpAction?($0) })
                                 }
                             }
                             if isFiltering && result.hiddenCount > 0 {
@@ -223,6 +229,7 @@ private struct HostGroup: View {
     let agents: [TrackedAgent]
     let unreachable: Bool
     let now: Date
+    let onJump: (TrackedAgent) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -238,7 +245,7 @@ private struct HostGroup: View {
                     if index > 0 {
                         RowSeparator()
                     }
-                    AgentRow(agent: agent, now: now)
+                    AgentRow(agent: agent, now: now, onJump: { onJump(agent) })
                         .padding(.horizontal, Metrics.cardInset)
                 }
             }
@@ -308,6 +315,7 @@ private struct AgentRow: View {
 
     let agent: TrackedAgent
     let now: Date
+    var onJump: () -> Void = {}
 
     var body: some View {
         let text = AgentTitles.rowText(for: agent)
@@ -348,14 +356,18 @@ private struct AgentRow: View {
         .padding(.horizontal, Metrics.rowInset)
         .padding(.vertical, 8)
         .background(wash)
+        // The whole row answers, not only its text: a double-click in the gap
+        // before the status pill is still a double-click on this Agent.
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: onJump)
         .help(tooltip(for: text))
     }
 
     /// A blocked or done row blinks for as long as it stays that way — it is
     /// asking for a person, and it keeps asking until someone comes. Every
-    /// other row is plain. Rows do not light up under the pointer, because
-    /// clicking one does nothing and a hover highlight would promise that it
-    /// did.
+    /// other row is plain. Rows do not light up under the pointer: a single
+    /// click does nothing, and a hover highlight would promise that it did.
+    /// A double-click Jumps to the Agent, which the tooltip says.
     ///
     /// The inset is applied out here rather than inside the wash so that the
     /// layer being animated fills its own view exactly, with nothing between
@@ -390,8 +402,9 @@ private struct AgentRow: View {
     /// is the one the row shortens to its last component.
     private func tooltip(for text: AgentRowText) -> String {
         let lead = agent.info.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? text.primary
-        guard let session = text.session else { return "\(lead)\n\(text.secondary)" }
-        return "\(lead) · \(session)\n\(text.secondary)"
+        let hint = "Double-click to open in cmux"
+        guard let session = text.session else { return "\(lead)\n\(text.secondary)\n\(hint)" }
+        return "\(lead) · \(session)\n\(text.secondary)\n\(hint)"
     }
 }
 

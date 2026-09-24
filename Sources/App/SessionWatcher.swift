@@ -26,6 +26,7 @@ final class SessionWatcher {
     }
 
     func start() {
+        store.setSocketPath(socketPath, host: host.name, session: session.name)
         stopped = false
         forward?.start()
         let interval = UInt64(max(1, host.pollSeconds)) * 1_000_000_000
@@ -42,6 +43,7 @@ final class SessionWatcher {
         task?.cancel()
         task = nil
         forward?.stop()
+        store.setSocketPath(nil, host: host.name, session: session.name)
         store.removeSession(host: host.name, session: session.name)
     }
 

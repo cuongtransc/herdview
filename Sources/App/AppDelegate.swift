@@ -5,6 +5,7 @@ import HerdviewCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = AgentStore()
     private var monitor: Monitor?
+    private var jumper: SessionJumper?
     private var quotaMonitor: QuotaMonitor?
     private var statusBar: StatusBarController?
     private var notifier: TransitionNotifier?
@@ -70,6 +71,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let monitor = Monitor(config: config, store: store)
         self.monitor = monitor
         monitor.start()
+
+        let jumper = SessionJumper(hosts: config.hosts,
+                                   cmuxPath: config.cmuxPath ?? ConfigLoader.findCmux(),
+                                   store: store)
+        self.jumper = jumper
+        store.jumpAction = { [weak jumper] in jumper?.jump($0) }
 
         // Its first tick fetches at once, since the window was shown above.
         let quotaMonitor = QuotaMonitor(store: quotaStore) { [weak self] in
