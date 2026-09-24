@@ -17,7 +17,7 @@ enum CredentialReader {
     private static let itemNotFound: Int32 = 44
 
     static func read(_ provider: QuotaProvider) async -> CredentialLookup {
-        if let path = QuotaCredentials.filePath(for: provider, home: NSHomeDirectory()) {
+        if let path = QuotaCredentials.filePath(for: QuotaSource.sources(for: provider)[0], home: NSHomeDirectory()) {
             guard let data = FileManager.default.contents(atPath: path),
                   let credential = QuotaCredentials.parse(provider, data) else { return .notSignedIn }
             return .found(credential)
