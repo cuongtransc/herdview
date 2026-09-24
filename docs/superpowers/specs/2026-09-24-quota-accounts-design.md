@@ -23,7 +23,7 @@ In:
 
 - A second Source, pi (`~/.pi/agent/auth.json`), for OpenCode Go and Grok.
 - Grouping credentials into Accounts, one request and one row per Account.
-- An expired credential shown as `idle`, with no call to action (see Idle).
+- An expired credential shown as `quiet`, with no call to action (see Quiet).
 
 Out:
 
@@ -77,13 +77,13 @@ used; one without a known expiry ranks below any with one, and ties go to Source
 in the table above. That is why a Grok Account shows fresh numbers while pi runs even if
 the Grok CLI has not run for a day — no refresh involved, just the other Source's token.
 
-## Idle
+## Quiet
 
 An expired credential (HTTP 401, or 403 other than OpenCode's `EntitlementError`) is
-shown as `idle`, not "sign-in expired — run `<cli>`":
+shown as `quiet`, not "sign-in expired — run `<cli>`":
 
-- with a last report: its Windows dimmed, then `idle · updated 3h ago`;
-- without one: `idle`.
+- with a last report: its Windows dimmed, then `quiet · updated 3h ago`;
+- without one: `quiet`.
 
 The old wording asked the user to act, and there is nothing to do. A token expires
 because no Source has used the Account for hours, so its Quota has not moved and the
@@ -92,7 +92,7 @@ token and the next poll picks it up. The one case where the numbers are really s
 the Account used somewhere Herdview cannot read, such as grok.com — is not one that
 running a CLI to refresh a gauge would be worth it for.
 
-`QuotaProblem.signInExpired` becomes `.idle`; `QuotaProvider.signInCommand` goes, as
+`QuotaProblem.signInExpired` becomes `.quiet`; `QuotaProvider.signInCommand` goes, as
 nothing shows it any more. The log line keeps saying "sign-in expired": the log is for
 diagnosing, the row is for glancing.
 
@@ -141,6 +141,6 @@ TDD in `HerdviewCoreTests`:
 - Entry carry-over: an Account's `last` report survives a failed fetch; a vanished
   Account's entry is dropped.
 - Row title: one Account → Provider name; several → name with Sources.
-- Idle: message is `idle`; with a last report the note is `idle · updated <age>`.
+- Quiet: message is `quiet`; with a last report the note is `quiet · updated <age>`.
 
 `mise run ci` green; `ui:shots` fixture with two OpenCode Go Accounts checked by eye.

@@ -54,9 +54,9 @@ rather than wrong numbers.
 
 ## Updates
 
-### 2026-09-24: Expired reads as "idle", and a second Source can cover it
+### 2026-09-24: Expired reads as "quiet", and a second Source can cover it
 
-The decision stands. An expired credential is now shown as `idle · updated <age>` with
+The decision stands. An expired credential is now shown as `quiet · updated <age>` with
 no "run `<cli>`": nothing needs doing, as the Consequences above already argue. And
 [0006](0006-quota-per-account-from-every-source.md) reads pi as a second Source, so an
 Account one tool has stopped using still shows fresh numbers while another tool uses
