@@ -195,7 +195,11 @@ private struct QuotaMiniGauge: View {
     private static let barWidth: CGFloat = 30
     private static let barHeight: CGFloat = 4
     private static let iconSide: CGFloat = 18
-    private static let percentWidth: CGFloat = 24
+    /// Wide enough for a three-digit percent in the heavier warning weight:
+    /// `100%` measures 27.32 pt regular and 28.73 pt semibold at this font, and
+    /// a full Window is a warning, so the column takes the semibold width. The
+    /// frame rounds it up the way the panel's does.
+    private static let percentWidth: CGFloat = 29
 
     let provider: QuotaProvider
     let title: String
@@ -245,6 +249,7 @@ private struct QuotaMiniGauge: View {
                     .font(.system(size: 9.5).monospacedDigit())
                     .fontWeight(warning ? .semibold : .regular)
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
                     .frame(width: Self.percentWidth, alignment: .leading)
             }
         }

@@ -126,7 +126,11 @@ struct ProviderIcon: View {
 struct WindowLine: View {
     /// Wide enough for `week · Fable`, the longest label a Provider sends.
     private static let labelWidth: CGFloat = 74
-    private static let percentWidth: CGFloat = 30
+    /// Wide enough for a three-digit percent in the heavier warning weight:
+    /// `100%` measures 31.22 pt regular and 32.86 pt semibold at this font, and
+    /// a full Window is a warning (at `warningPercent`), so the column takes
+    /// the semibold width. Truncation, never wrapping, if a wider value comes.
+    private static let percentWidth: CGFloat = 33
     private static let resetWidth: CGFloat = 44
 
     let window: QuotaWindow
@@ -144,6 +148,7 @@ struct WindowLine: View {
             Text(QuotaFormat.percent(window.usedPercent))
                 .fontWeight(warning ? .semibold : .regular)
                 .foregroundStyle(.primary)
+                .lineLimit(1)
                 .frame(width: Self.percentWidth, alignment: .trailing)
             Text(QuotaFormat.untilReset(window.resetsAt, now: now) ?? "")
                 .foregroundStyle(.secondary)
