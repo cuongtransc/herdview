@@ -78,7 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.jumpAction = { [weak jumper] in jumper?.jump($0) }
         store.canJump = cmuxPath != nil
         if let target = JumpBench.target {
-            JumpBench.run(target: target, store: store, jumper: jumper)
+            JumpBench.run(target: target, store: store, jumper: jumper) { [weak self] code in
+                self?.monitor?.stop()
+                exit(code)
+            }
         }
 
         // Its first tick fetches at once, since the window was shown above.

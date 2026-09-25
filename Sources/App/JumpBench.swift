@@ -22,8 +22,11 @@ enum JumpBench {
     }
 
     /// Waits for the target's first Agent, Jumps `count` times with a pause
-    /// between, prints the summary and exits: 0 when every Jump finished.
-    static func run(target: String, store: AgentStore, jumper: SessionJumper) {
+    /// between, prints the summary and ends through `finish`: 0 when every
+    /// Jump finished. `finish` must stop what the app started — a bare
+    /// `exit` left each run's ssh forwards running with no parent.
+    static func run(target: String, store: AgentStore, jumper: SessionJumper,
+                    finish: @escaping @MainActor (Int32) -> Never) {
         let parts = target.split(separator: "/", maxSplits: 1).map(String.init)
         let host = parts[0]
         let session = parts.count > 1 ? parts[1] : nil
@@ -39,13 +42,13 @@ enum JumpBench {
             }
             guard let agent else {
                 FileHandle.standardError.write(Data("jump-bench: no agent on \(target) after 30 s\n".utf8))
-                exit(2)
+                finish(2)
             }
             print("jump-bench: \(count) jumps to \(agent.host)/\(agent.session) pane \(agent.info.paneId)")
             for i in 1...count {
                 guard let jump = jumper.jump(agent, source: .bench) else {
                     FileHandle.standardError.write(Data("jump-bench: jump \(i) did not start\n".utf8))
-                    exit(2)
+                    finish(2)
                 }
                 await jump.value
                 // Hand the screen back so the next Jump brings cmux forward again.
@@ -55,7 +58,7 @@ enum JumpBench {
             let mine = ((try? log.readAll()) ?? []).filter { $0.source == .bench && $0.at >= started }
             let summary = JumpTiming.summary(of: mine)
             print(JumpTiming.report(summary))
-            exit(summary.failed == 0 && summary.jumps == count ? 0 : 1)
+            finish(summary.failed == 0 && summary.jumps == count ? 0 : 1)
         }
     }
 }
