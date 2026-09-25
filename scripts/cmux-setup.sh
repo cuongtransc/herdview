@@ -65,4 +65,5 @@ BLOCK="$block" awk 'NR == 1 { print; print ENVIRON["BLOCK"]; print ""; next } { 
 chmod 600 "$tmp"
 mv "$tmp" "$CMUX_JSON"
 echo "automation mode on in $CMUX_JSON (backup: $backup)"
+echo "note: any process running as $(id -un) can now drive cmux, not only ones started inside it"
 reload

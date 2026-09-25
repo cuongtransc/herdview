@@ -76,7 +76,10 @@ socket to automation mode — any process of your macOS user — in
 `~/.config/cmux/cmux.json` (backing the file up first) and reloads cmux. Or set
 Settings › Automation › Socket Control Mode to Automation mode by hand. Not Password
 mode: cmux's own shell integration sends no password, so every message its hooks
-send is refused.
+send is refused. The trade-off: in automation mode any process running as you can
+drive cmux, including typing into its terminals — not only processes started inside
+cmux. A password would not narrow that, since it sits in a file your user can read;
+keep the default mode if that matters more than opening Herdview from the Dock.
 
 cmux reports no tty for the tabs it opens now, so Herdview remembers the tab it
 opened for each session in `~/.herdview/jump-tabs.json` and focuses that one next
