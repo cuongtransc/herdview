@@ -111,7 +111,8 @@ Off the main thread:
 4. Activate `cmux.app`.
 
 **`AgentListView`** — the Agent row gets a double-click gesture that calls the jumper,
-a hover state that lightens it and turns the title line into one `Button` link, and a tooltip hint. `AgentStore` carries
+a hover state that lightens it and turns the title line into one `Button` link. The tooltip is unchanged: the hover
+state is the hint. `AgentStore` carries
 `canJump` and `jumpingKey` for it.
 
 ## Errors

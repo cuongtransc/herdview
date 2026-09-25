@@ -461,9 +461,8 @@ private struct AgentRow: View {
     /// is the one the row shortens to its last component.
     private func tooltip(for text: AgentRowText) -> String {
         let lead = agent.info.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? text.primary
-        let hint = "Click the name, or double-click the row, to open it in cmux"
-        guard let session = text.session else { return "\(lead)\n\(text.secondary)\n\(hint)" }
-        return "\(lead) · \(session)\n\(text.secondary)\n\(hint)"
+        guard let session = text.session else { return "\(lead)\n\(text.secondary)" }
+        return "\(lead) · \(session)\n\(text.secondary)"
     }
 }
 
