@@ -155,6 +155,8 @@ reached through `ssh -N -L ~/.herdview/sock/<host>-<session>.sock:<remote socket
 mise trust                     # once, so mise will load mise.toml
 mise run dev                   # debug build → build/Herdview.app, quit any running Herdview, open the new one
 mise run build                 # release build/Herdview.app (CONFIG=debug for unoptimised); doesn't launch it
+mise run build --reveal        # the same, then show the app in Finder
+mise run app:install           # release build → /Applications/Herdview.app (INSTALL_DIR=… elsewhere), quit the old one, open it
 mise run test                  # unit tests
 mise run ui:shots              # window from fixtures → build/ui-shots/*.png, checks clicks and alignment
 mise run ci                    # the gate before a PR: test, then ui:shots
@@ -162,9 +164,9 @@ mise run clean
 mise run icon --color 5C43DC   # redraw scripts/AppIcon.icns (the default accent if --color is left out)
 ```
 
-To keep a build you use every day, `mise run build` and copy
-`build/Herdview.app` into `/Applications`. `mise run dev` quits whichever
-Herdview is running first: the bundle id is the same for every build, so
+To keep a build you use every day, `mise run app:install`: it replaces
+`/Applications/Herdview.app` with a fresh release build and opens it. It and
+`mise run dev` both quit whichever Herdview is running first: the bundle id is the same for every build, so
 opening a new one while another runs only brings the old one forward.
 
 Or without mise: `swift test && ./scripts/build-app.sh && open build/Herdview.app`.
