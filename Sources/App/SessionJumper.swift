@@ -71,9 +71,12 @@ final class SessionJumper {
     }
 
     private func bringSessionForward(host: HostConfig, session: String, cmux: String) async throws {
+        // Side by side: each takes about a quarter second and neither needs
+        // the other. Without a process list no tab can be recognised; a new
+        // tab is still a Jump.
+        async let processes = try? ProcessRunner.run(Self.ps, timeoutSeconds: Self.timeoutSeconds)
         let layout = try CmuxLayout.parse(tree: try await run(CmuxCommand.tree(cmux: cmux), label: "tree"))
-        // Without a process list no tab can be recognised; a new tab is still a Jump.
-        let psOutput = try? await ProcessRunner.run(Self.ps, timeoutSeconds: Self.timeoutSeconds)
+        let psOutput = await processes
         let clients = AttachClient.parse(ps: psOutput.flatMap { String(data: $0, encoding: .utf8) } ?? "")
         switch Jump.route(host: host, session: session, clients: clients, layout: layout) {
         case .focus(let surface):
