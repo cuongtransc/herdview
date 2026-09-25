@@ -13,10 +13,10 @@ final class JumpTimingTests: XCTestCase {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    private func record(_ steps: [(String, Double)], outcome: JumpTiming.Outcome = .focus,
+    private func record(_ steps: [(String, Double)], outcome: JumpTiming.Outcome = .focus, error: String? = nil,
                         at seconds: TimeInterval = 0) -> JumpTiming {
         JumpTiming(at: Date(timeIntervalSince1970: 1_790_000_000 + seconds), source: .click, outcome: outcome,
-                   tabs: 42, steps: steps.map { JumpTiming.Step(name: $0.0, ms: $0.1) })
+                   error: error, tabs: 42, steps: steps.map { JumpTiming.Step(name: $0.0, ms: $0.1) })
     }
 
     // MARK: - Recorder
@@ -38,7 +38,7 @@ final class JumpTimingTests: XCTestCase {
     func testAppendWritesOneJSONLinePerJumpThatReadsBack() throws {
         let log = JumpTimingLog(path: directory.appendingPathComponent("t.jsonl").path)
         let first = record([("cmux tree", 221.5)])
-        let second = record([("ps", 300)], outcome: .failed("cmux tree: denied"), at: 5)
+        let second = record([("ps", 300)], outcome: .failed, error: "cmux tree: denied", at: 5)
         try log.append(first)
         try log.append(second)
 
@@ -80,7 +80,7 @@ final class JumpTimingTests: XCTestCase {
     func testSummaryGivesPercentilesPerStepInFirstSeenOrder() {
         let records = (1...10).map { i in
             record([("cmux tree", Double(i * 10)), ("ps", Double(i))], at: Double(i))
-        } + [record([("cmux tree", 999)], outcome: .failed("x"), at: 11)]
+        } + [record([("cmux tree", 999)], outcome: .failed, error: "x", at: 11)]
 
         let summary = JumpTiming.summary(of: records)
         XCTAssertEqual(summary.jumps, 11)

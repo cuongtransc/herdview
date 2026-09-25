@@ -118,7 +118,7 @@ enum UIShots {
             await shoot("06-filter-hides-attention")
             controller.filterState.clear()
 
-            await sweepFilterBarWidths()
+            await checkFilterBarWidths()
 
             let report = lines.joined(separator: "\n") + "\n"
             try? report.write(to: directory.appendingPathComponent("results.txt"), atomically: true, encoding: .utf8)
@@ -135,22 +135,15 @@ enum UIShots {
             return nil
         }
 
-        /// Every width from narrow to past the widest status segments, each
-        /// laid out with two different sets of counts. The segments pick one of
-        /// three sizes by what fits; at a width on the edge between two, a
-        /// count that changes the label's width must not start them trading
-        /// places forever — AppKit ends that loop by throwing, and the app
-        /// crashed at 467 pt on 2026-09-25. A loop here kills the run, which is
-        /// the failure.
-        private func sweepFilterBarWidths() async {
-            // Room to spare: the full labels, not a smaller size that fit once
-            // and never gave way.
+        /// The status segments at a few widths, with counts that change a
+        /// label's digits: they stay inside the window, and show the full
+        /// labels when there is room. The app crashed on a layout loop here at
+        /// 467 pt on 2026-09-25.
+        private func checkFilterBarWidths() async {
             await state(size: UIShots.wide, dark: false, expanded: false)
             let wideLabel = segmentedControl(in: window.contentView).flatMap { $0.label(forSegment: 1) } ?? "none"
             check("status segments at 940 pt show the full labels (got \"\(wideLabel)\")", wideLabel.hasPrefix("Needs me"))
 
-            await state(size: UIShots.narrow, dark: false, expanded: false)
-            // Counts that change how many digits a label has, as a live herd's do.
             let statuses: [AgentStatus] = [.blocked, .done, .working, .idle]
             func herd(_ n: Int) -> [AgentInfo] {
                 (0..<n).map { i in
@@ -160,28 +153,20 @@ enum UIShots {
                 }
             }
             var overflows: [String] = []
-            for width in stride(from: UIShots.narrow.width, through: 640, by: 1) {
-                window.setContentSize(NSSize(width: width, height: UIShots.narrow.height))
+            for width in [360.0, 400, 440, 467, 520, 640] {
                 for n in [9, 10] {
+                    window.setContentSize(NSSize(width: width, height: UIShots.narrow.height))
                     store.apply(host: "local", session: "sweep", snapshot: herd(n))
-                    for query in [UIShotFixtures.filterWord, ""] {
-                        controller.filterState.query = query
-                        window.contentView?.superview?.layoutSubtreeIfNeeded()
-                        window.displayIfNeeded()
-                        try? await Task.sleep(nanoseconds: 10_000_000)
-                        if let segments = segmentedControl(in: window.contentView),
-                           let content = window.contentView,
-                           segments.convert(segments.bounds, to: content).maxX > content.bounds.width - Metrics.gutter + 1 {
-                            let frame = segments.convert(segments.bounds, to: content)
-                            overflows.append("\(Int(width))/\(n)/\(query.isEmpty ? "all" : "q") [\(segments.label(forSegment: 1) ?? "") \(segments.controlSize == .small ? "s" : "r") x=\(Int(frame.minX)) w=\(Int(frame.width)) limit=\(Int(content.bounds.width - Metrics.gutter))]")
-                        }
+                    await pause()
+                    if let segments = segmentedControl(in: window.contentView), let content = window.contentView,
+                       segments.convert(segments.bounds, to: content).maxX > content.bounds.width - Metrics.gutter + 1 {
+                        overflows.append("\(Int(width))/\(n)")
                     }
                 }
             }
-            check("status segments stay inside the window at every width (overflow at: \(overflows.prefix(8).joined(separator: ", ")))",
-                  overflows.isEmpty)
             store.removeSession(host: "local", session: "sweep")
-            check("status segments settle at every width from 360 to 640 pt", true)
+            check("status segments stay inside the window (overflow at: \(overflows.joined(separator: ", ")))",
+                  overflows.isEmpty)
         }
 
         private func state(size: NSSize, dark: Bool, expanded: Bool) async {

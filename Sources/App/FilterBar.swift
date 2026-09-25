@@ -18,42 +18,23 @@ struct FilterBar: View {
     /// Bound to the field rather than tracked by hand, so AppKit's own focus
     /// ring and the caret follow the same state this code sets.
     @FocusState private var isFocused: Bool
-    /// The segments' size, as an index into `sizes`, and the width they have.
-    @State private var size: Int?
-    @State private var available: CGFloat = 0
-
-    /// Widest first. A segmented control does not shrink: given less room
-    /// than its labels need, it runs past the window's edge and the last
-    /// segment is cut off. So it steps down until it fits — full size, then
-    /// small, then small with the short labels — and the counts, which are the
-    /// point, survive every step.
-    private static let sizes: [(short: Bool, control: ControlSize)] = [
-        (false, .regular), (false, .small), (true, .small),
-    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             searchField
-            // One control, its size decided by `SegmentFit` from measured
-            // widths. Not `ViewThatFits` over the three sizes: on a width at the
-            // edge between two, AppKit's constraint passes traded them forever
-            // and threw, which crashed the app.
-            //
-            // A GeometryReader around the control, not a preference from a
-            // background one: inside the list's LazyVStack the preference never
-            // arrived, and the segments stayed at their smallest in any width.
-            let chosen = Self.sizes[min(size ?? 0, Self.sizes.count - 1)]
-            GeometryReader { proxy in
-                scopePicker(short: chosen.short)
-                    .controlSize(chosen.control)
-                    .onAppear { measure(proxy.size.width) }
-                    .onChange(of: proxy.size.width) { measure($0) }
-                    .onChange(of: counts) { _ in refit() }
+            // A segmented control does not shrink: given less room than its
+            // labels need, it runs past the window's edge and the last segment
+            // is cut off. So it steps down until it fits — full size, then
+            // small, then small with the short labels — and the counts, which
+            // are the point, survive every step.
+            ViewThatFits(in: .horizontal) {
+                scopePicker(short: false).controlSize(.regular)
+                scopePicker(short: false).controlSize(.small)
+                scopePicker(short: true).controlSize(.small)
             }
-            // One height for every size. The size must not change the list's
-            // height: a taller row can bring up the list's scroller, which takes
-            // 15–17 pt of width, which picks a smaller size, which sends the
-            // scroller away again — the loop that crashed the app at 467 pt.
+            // One height whichever size fits. A taller size could bring up the
+            // list's scroller, whose width then picks a shorter size, which
+            // sends the scroller away: AppKit crashed on that loop (2026-09-25).
             .frame(height: 24)
         }
         // ⌘F is the menu's, not this view's: the menu item is the only thing
@@ -66,30 +47,16 @@ struct FilterBar: View {
         .onReceive(filter.$focusRequest.dropFirst()) { _ in isFocused = true }
     }
 
-    private func measure(_ width: CGFloat) {
-        available = width
-        refit()
-    }
-
-    private func refit() {
-        let needs = Self.sizes.map { SegmentWidths.width(labels: labels(short: $0.short), controlSize: $0.control) }
-        let next = SegmentFit.choose(available: Double(available), needs: needs.map(Double.init), current: size)
-        if next != size { size = next }
-    }
-
-    private func labels(short: Bool) -> [String] {
-        AgentScope.allCases.map { "\(short ? $0.shortTitle : $0.title) \(counts[$0, default: 0])" }
-    }
-
     private func scopePicker(short: Bool) -> some View {
         Picker("", selection: $filter.scope) {
-            ForEach(Array(zip(AgentScope.allCases, labels(short: short))), id: \.0) { scope, label in
-                Text(label).tag(scope)
+            ForEach(AgentScope.allCases, id: \.self) { scope in
+                Text("\(short ? scope.shortTitle : scope.title) \(counts[scope, default: 0])").tag(scope)
             }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        // At its own width: the room around it is the frame's, not the control's.
+        // Measured at its own width, so `ViewThatFits` sees what it needs
+        // rather than whatever it was offered.
         .fixedSize()
     }
 
@@ -194,35 +161,5 @@ struct FilterFooter: View {
         // count would restate the rows still on screen.
         if hiddenHosts > 0 { line += " · \(hiddenHosts) hosts" }
         return line
-    }
-}
-
-/// What a segmented control with these labels needs, measured on one AppKit
-/// never puts in a window, so measuring cannot disturb the window's layout.
-/// Cached by labels: they change only when a count does.
-@MainActor
-enum SegmentWidths {
-    private static var cache: [String: CGFloat] = [:]
-    /// SwiftUI's segmented picker draws a little wider than a bare
-    /// NSSegmentedControl; a few points spare keep "fits" honest.
-    private static let margin: CGFloat = 8
-
-    static func width(labels: [String], controlSize: ControlSize) -> CGFloat {
-        let size: NSControl.ControlSize = controlSize == .small ? .small : .regular
-        let key = "\(size.rawValue)|" + labels.joined(separator: "|")
-        if let width = cache[key] { return width }
-        // As SwiftUI draws a segmented Picker: every segment as wide as the
-        // widest. Each label is measured in a one-segment control of its own —
-        // `fittingSize` of a whole `.fillEqually` control came back sometimes
-        // equal and sometimes natural.
-        let widest = labels.map { label -> CGFloat in
-            let control = NSSegmentedControl(labels: [label], trackingMode: .selectOne, target: nil, action: nil)
-            control.controlSize = size
-            control.font = .systemFont(ofSize: NSFont.systemFontSize(for: size))
-            return control.fittingSize.width
-        }.max() ?? 0
-        let width = widest * CGFloat(labels.count) + margin
-        cache[key] = width
-        return width
     }
 }
