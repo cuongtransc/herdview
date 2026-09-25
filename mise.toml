@@ -54,6 +54,25 @@ open "$DEST"
 description = "Let Herdview opened from the Dock drive cmux (socket password mode)"
 run = "./scripts/cmux-setup.sh"
 
+[tasks."jump:stats"]
+description = "Percentiles of the Jumps this Mac has timed (~/.herdview/jump-timings.jsonl)"
+run = """
+./scripts/build-app.sh debug >/dev/null
+./build/Herdview.app/Contents/MacOS/herdview --jump-stats
+"""
+
+[tasks."bench:jump"]
+description = "Jump to one agent N times with no clicks and print step timings; moves the screen to cmux"
+usage = '''
+arg "<target>" help="host or host/session to jump into"
+flag "--count <n>" default="5" help="how many Jumps"
+'''
+run = """
+./scripts/build-app.sh debug >/dev/null
+mise run app:quit
+HERDVIEW_JUMP_BENCH="$usage_target" HERDVIEW_JUMP_BENCH_COUNT="$usage_count" ./build/Herdview.app/Contents/MacOS/herdview
+"""
+
 [tasks.test]
 description = "Run the unit tests"
 run = "swift test"
