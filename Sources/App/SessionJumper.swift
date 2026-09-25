@@ -32,6 +32,8 @@ final class SessionJumper {
     private let cmuxPath: String?
     private let store: AgentStore
     private let timingLog: JumpTimingLog
+    /// The tab each Session was last opened in, for a tab cmux gives no tty.
+    private var tabs: JumpTabs
     private var running = false
 
     init(hosts: [HostConfig], cmuxPath: String?, store: AgentStore, timingLog: JumpTimingLog = JumpTimingLog()) {
@@ -39,6 +41,7 @@ final class SessionJumper {
         self.cmuxPath = cmuxPath
         self.store = store
         self.timingLog = timingLog
+        self.tabs = JumpTabs.load()
     }
 
     /// Starts a Jump; the returned task ends once its timing is written, which
@@ -150,16 +153,31 @@ final class SessionJumper {
         // Only what is left of ps once the tree is in: the two run side by side.
         recorder.lap("ps wait")
         let clients = AttachClient.parse(ps: psOutput.flatMap { String(data: $0, encoding: .utf8) } ?? "")
-        switch Jump.route(host: host, session: session, clients: clients, layout: layout) {
+        let remembered = tabs.surface(host: host.name, session: session)
+        switch Jump.route(host: host, session: session, clients: clients, layout: layout, remembered: remembered) {
         case .focus(let surface):
             _ = try await run(CmuxCommand.focus(cmux: cmux, surface: surface), label: "focus-panel")
             recorder.lap("cmux focus-panel")
             return (.focus, layout.surfaces.count)
         case .open:
             let attach = HostCommand.attach(for: host, session: session).shellLine
-            _ = try await run(CmuxCommand.open(cmux: cmux, layout: layout, command: attach), label: "new-surface")
+            let output = try await run(CmuxCommand.open(cmux: cmux, layout: layout, command: attach), label: "new-surface")
             recorder.lap("cmux new-surface")
+            if let opened = CmuxCommand.openedSurfaceId(output: String(decoding: output, as: UTF8.self)) {
+                tabs.remember(opened, host: host.name, session: session)
+                saveTabs()
+            } else if remembered != nil {
+                // The tab it remembered is closed; a stale id only costs a lookup, but it is wrong.
+                tabs.forget(host: host.name, session: session)
+                saveTabs()
+            }
             return (.open, layout.surfaces.count)
+        }
+    }
+
+    private func saveTabs() {
+        do { try tabs.save() } catch {
+            NSLog("herdview: could not write %@: %@", tabs.path, String(describing: error))
         }
     }
 

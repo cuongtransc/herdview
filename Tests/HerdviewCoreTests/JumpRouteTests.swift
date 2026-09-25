@@ -62,4 +62,31 @@ final class JumpRouteTests: XCTestCase {
                                   layout: layout([surface(1, tty: "ttys001")])),
                        .open)
     }
+
+    // MARK: - A tab Herdview opened, which cmux gives no tty
+
+    private func unknownTTY(_ n: Int, id: String) -> CmuxSurface {
+        CmuxSurface(ref: "surface:\(n)", id: id, tty: nil, workspaceRef: "workspace:1", windowRef: "window:1")
+    }
+
+    func testRememberedTabIsFocusedWhenNoTTYMatches() {
+        let tab = unknownTTY(251, id: "F35E")
+        XCTAssertEqual(Jump.route(host: hms, session: "default", clients: [],
+                                  layout: layout([surface(1, tty: "ttys001"), tab]), remembered: "F35E"),
+                       .focus(tab))
+    }
+
+    func testTTYMatchWinsOverTheRememberedTab() {
+        let byTTY = surface(2, tty: "ttys017")
+        XCTAssertEqual(Jump.route(host: hms, session: "default",
+                                  clients: [AttachClient(tty: "ttys017", sshTarget: "ct-hms-lan", session: "default")],
+                                  layout: layout([unknownTTY(251, id: "F35E"), byTTY]), remembered: "F35E"),
+                       .focus(byTTY))
+    }
+
+    func testRememberedTabThatIsGoneOpensOne() {
+        XCTAssertEqual(Jump.route(host: hms, session: "default", clients: [],
+                                  layout: layout([unknownTTY(9, id: "OTHER")]), remembered: "F35E"),
+                       .open)
+    }
 }

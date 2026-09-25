@@ -1,12 +1,14 @@
 #!/bin/sh
-# Lets a Dock-launched Herdview drive cmux: switches cmux's socket to password
-# mode with a fresh random password in ~/.config/cmux/cmux.json, then reloads
-# cmux. The cmux CLI reads that password itself, so Herdview needs nothing more.
+# Lets a Dock-launched Herdview drive cmux: switches cmux's socket to
+# "automation" mode in ~/.config/cmux/cmux.json, then reloads cmux.
 #
 # cmux's default mode ("cmux processes only") admits only processes started
 # inside a cmux terminal; an app opened from the Dock or Finder is refused.
+# "automation" admits any process of this macOS user. Not "password": in that
+# mode cmux's own shell integration, which sends no password, has every hook
+# message refused ("Authentication required").
 #
-# Safe to re-run: a file already in password mode is left alone, and a file
+# Safe to re-run: a file already in automation mode is left alone, and a file
 # whose `automation` block says something else is not rewritten — cmux.json is
 # JSONC the person may have edited by hand.
 set -eu
@@ -23,11 +25,9 @@ reload() {
   echo "could not reload cmux; the setting takes effect when cmux next starts"
 }
 
-password="$(openssl rand -hex 24)"
-block="  \"automation\": {
-    \"socketControlMode\": \"password\",
-    \"socketPassword\": \"$password\"
-  },"
+block='  "automation": {
+    "socketControlMode": "automation"
+  },'
 
 if [ ! -s "$CMUX_JSON" ]; then
   mkdir -p "$(dirname "$CMUX_JSON")"
@@ -41,11 +41,11 @@ fi
 # Only a live (uncommented) key counts; cmux's template carries the whole
 # settings list commented out.
 if grep -Eq '^[[:space:]]*"automation"[[:space:]]*:' "$CMUX_JSON"; then
-  if grep -Eq '^[[:space:]]*"socketControlMode"[[:space:]]*:[[:space:]]*"password"' "$CMUX_JSON"; then
-    echo "cmux is already in password mode ($CMUX_JSON)"
+  if grep -Eq '^[[:space:]]*"socketControlMode"[[:space:]]*:[[:space:]]*"automation"' "$CMUX_JSON"; then
+    echo "cmux is already in automation mode ($CMUX_JSON)"
     exit 0
   fi
-  echo "$CMUX_JSON already sets \"automation\"; set socketControlMode to \"password\" and a socketPassword there by hand, then run: cmux reload-config" >&2
+  echo "$CMUX_JSON already sets \"automation\"; set socketControlMode to \"automation\" there by hand (and drop any socketPassword), then run: cmux reload-config" >&2
   exit 1
 fi
 
@@ -64,5 +64,5 @@ BLOCK="$block" awk 'NR == 1 { print; print ENVIRON["BLOCK"]; print ""; next } { 
 [ "$(wc -l < "$tmp")" -gt "$(wc -l < "$CMUX_JSON")" ] || { rm -f "$tmp"; echo "edit produced nothing new; $CMUX_JSON left as it was" >&2; exit 1; }
 chmod 600 "$tmp"
 mv "$tmp" "$CMUX_JSON"
-echo "password mode on in $CMUX_JSON (backup: $backup)"
+echo "automation mode on in $CMUX_JSON (backup: $backup)"
 reload

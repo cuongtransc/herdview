@@ -72,9 +72,17 @@ opens instead. Herdview finds cmux in `/opt/homebrew/bin`, `/usr/local/bin` or
 
 cmux admits only processes started inside it by default, so a Herdview opened from
 the Dock or Finder is refused. Run `mise run cmux:setup` once: it switches cmux's
-socket to password mode with a random password in `~/.config/cmux/cmux.json`
-(backing the file up first) and reloads cmux. Or set Settings › Automation to
-Password by hand.
+socket to automation mode — any process of your macOS user — in
+`~/.config/cmux/cmux.json` (backing the file up first) and reloads cmux. Or set
+Settings › Automation › Socket Control Mode to Automation mode by hand. Not Password
+mode: cmux's own shell integration sends no password, so every message its hooks
+send is refused.
+
+cmux reports no tty for the tabs it opens now, so Herdview remembers the tab it
+opened for each session in `~/.herdview/jump-tabs.json` and focuses that one next
+time. Every Jump's step timings go to `~/.herdview/jump-timings.jsonl`;
+`mise run jump:stats` prints their percentiles, and `mise run bench:jump <host>`
+times a run of Jumps with no one clicking (it moves the screen to cmux each time).
 
 The list scrolls and the host headings stay put as it does. The window remembers
 where you put it and how big you made it. `Keep on Top` in the Window menu

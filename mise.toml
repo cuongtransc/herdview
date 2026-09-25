@@ -51,7 +51,7 @@ open "$DEST"
 """
 
 [tasks."cmux:setup"]
-description = "Let Herdview opened from the Dock drive cmux (socket password mode)"
+description = "Let Herdview opened from the Dock drive cmux (socket automation mode)"
 run = "./scripts/cmux-setup.sh"
 
 [tasks."jump:stats"]
