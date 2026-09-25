@@ -48,6 +48,12 @@ who is not looking at the window. macOS owns whether it is shown; Herdview has n
 for it.
 _Avoid_: Toast, alert, popup
 
+**Jump**:
+Bringing an Agent to the front for a person: the terminal tab attached to the Agent's
+Session comes forward, or a new one opens, with the Agent's pane focused inside Herdr.
+Started by a double-click on the Agent's row; it never changes Status or a Highlight.
+_Avoid_: Open, attach, switch
+
 **Since**:
 The moment Herdview observed an Agent's current Status. Herdr does not report timestamps,
 so timers count from observation, not from the real change.

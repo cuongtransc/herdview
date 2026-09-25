@@ -23,6 +23,7 @@ never from agent hooks. See `docs/adr/` for why.
 # account for. Any of: claude, codex, opencodeGo, grok. Keep it above the first
 # [[hosts]] — below one, TOML reads it as a key of that host.
 hidden_providers = ["codex"]
+# cmux_path = "/opt/homebrew/bin/cmux"   # optional; where cmux is
 
 [[hosts]]
 name = "local"
@@ -58,6 +59,17 @@ as long as its agent is `blocked` (orange) or `done` (blue) — the two statuses
 that are asking for a person — so a glance at the window answers whether
 anything is waiting on you, and it keeps asking until you come. Every blinking
 row pulses in step.
+
+Point at an agent's row and its title — directory and session — turns into a link: click it, or
+double-click anywhere on the row, to jump to the agent in [cmux](https://cmux.dev): its pane is
+focused inside Herdr, and the cmux tab attached to its session comes forward. With
+no such tab, a new one opens running `herdr session attach <session>` — over
+`ssh -t <ssh>` for a remote host. A tab counts as attached to a remote session when
+its command names the host's `ssh` value exactly, so a tab you opened with
+`ssh user@box` is not recognised for a host configured as `ssh = "box"`; a new tab
+opens instead. Herdview finds cmux in `/opt/homebrew/bin`, `/usr/local/bin` or
+`cmux.app`; set `cmux_path` above the first `[[hosts]]` if it lives elsewhere.
+
 The list scrolls and the host headings stay put as it does. The window remembers
 where you put it and how big you made it. `Keep on Top` in the Window menu
 (⌘T) makes it float above other apps' windows so the herd stays readable while

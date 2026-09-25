@@ -213,4 +213,32 @@ final class ConfigLoaderTests: XCTestCase {
                                           isExecutable: { _ in false })
         XCTAssertEqual(found, "/opt/homebrew/bin/herdr")
     }
+
+    func testCmuxPathIsRead() throws {
+        let config = try ConfigLoader.parse("""
+        cmux_path = "/opt/cmux/bin/cmux"
+
+        [[hosts]]
+        name = "local"
+        herdr_path = "/opt/homebrew/bin/herdr"
+        """)
+        XCTAssertEqual(config.cmuxPath, "/opt/cmux/bin/cmux")
+    }
+
+    func testCmuxPathDefaultsToNil() throws {
+        XCTAssertNil(try ConfigLoader.parse("").cmuxPath)
+    }
+
+    func testCmuxPathMustBeAString() {
+        XCTAssertThrowsError(try ConfigLoader.parse("cmux_path = 3\n")) { error in
+            XCTAssertEqual(error as? ConfigError, .invalidType("cmux_path must be a string"))
+        }
+    }
+
+    func testFindCmuxTakesTheFirstExecutable() {
+        XCTAssertEqual(ConfigLoader.findCmux(isExecutable: { $0 == "/Applications/cmux.app/Contents/Resources/bin/cmux" }),
+                       "/Applications/cmux.app/Contents/Resources/bin/cmux")
+        XCTAssertEqual(ConfigLoader.findCmux(isExecutable: { _ in true }), "/opt/homebrew/bin/cmux")
+        XCTAssertNil(ConfigLoader.findCmux(isExecutable: { _ in false }))
+    }
 }

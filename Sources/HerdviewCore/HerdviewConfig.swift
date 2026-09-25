@@ -23,10 +23,13 @@ public struct HerdviewConfig: Equatable, Sendable {
     /// with no account on this Mac is a row that can only ever say "not signed
     /// in", which in a card of numbers is noise.
     public var hiddenProviders: Set<QuotaProvider>
+    /// Where `cmux` is, from `cmux_path`; nil means look in the usual places.
+    public var cmuxPath: String?
 
-    public init(hosts: [HostConfig], hiddenProviders: Set<QuotaProvider> = []) {
+    public init(hosts: [HostConfig], hiddenProviders: Set<QuotaProvider> = [], cmuxPath: String? = nil) {
         self.hosts = hosts
         self.hiddenProviders = hiddenProviders
+        self.cmuxPath = cmuxPath
     }
 
     /// What the Quota card shows and what is fetched for it: every Provider in
@@ -155,6 +158,16 @@ public enum ConfigLoader {
         return (usual + fromPath).first(where: isExecutable) ?? usual[0]
     }
 
+    /// Where `cmux` is on this Mac, for a Jump. Unlike `findHerdr` there is no
+    /// fallback: with no cmux a Jump says so instead of running a path that is
+    /// not there.
+    public static func findCmux(
+        isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) -> String? {
+        ["/opt/homebrew/bin/cmux", "/usr/local/bin/cmux", "/Applications/cmux.app/Contents/Resources/bin/cmux"]
+            .first(where: isExecutable)
+    }
+
     public static func parse(_ text: String) throws -> HerdviewConfig {
         let doc: TOMLDocument
         do {
@@ -182,6 +195,12 @@ public enum ConfigLoader {
             }
         }
 
+        var cmuxPath: String?
+        if let raw = doc.root["cmux_path"] {
+            guard let value = raw.stringValue else { throw ConfigError.invalidType("cmux_path must be a string") }
+            cmuxPath = value
+        }
+
         var hosts: [HostConfig] = []
         for (index, entry) in (doc.arrays["hosts"] ?? []).enumerated() {
             guard let name = entry["name"]?.stringValue else { throw ConfigError.missingField(host: index, field: "name") }
@@ -195,6 +214,6 @@ public enum ConfigLoader {
             hosts.append(HostConfig(name: name, ssh: ssh, herdrPath: herdrPath, pollSeconds: poll))
         }
 
-        return HerdviewConfig(hosts: hosts, hiddenProviders: hidden)
+        return HerdviewConfig(hosts: hosts, hiddenProviders: hidden, cmuxPath: cmuxPath)
     }
 }

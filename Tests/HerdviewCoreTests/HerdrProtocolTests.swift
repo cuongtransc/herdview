@@ -61,4 +61,26 @@ final class HerdrProtocolTests: XCTestCase {
             XCTAssertEqual(error as? HerdrError, HerdrError(code: "not_found", message: "pane not found"))
         }
     }
+
+    func testRequestLineCarriesParams() throws {
+        let line = try HerdrProtocol.requestLine(id: "req_2", method: "agent.focus",
+                                                 params: AgentTarget(target: "w1:p3"))
+        XCTAssertEqual(line.last, 0x0A)
+        let obj = try JSONSerialization.jsonObject(with: line.dropLast()) as? [String: Any]
+        XCTAssertEqual(obj?["method"] as? String, "agent.focus")
+        XCTAssertEqual((obj?["params"] as? [String: Any])?["target"] as? String, "w1:p3")
+    }
+
+    func testDecodeOkResult() throws {
+        let line = Data(#"{"id":"r","result":{"type":"ok"}}"#.utf8)
+        XCTAssertEqual(try HerdrProtocol.decodeResult(line, as: OkResult.self).type, "ok")
+    }
+
+    /// The error Herdr 0.9.1 really sends for a pane that is gone.
+    func testFocusOfMissingAgentThrowsHerdrError() {
+        let line = Data(#"{"id":"t1","error":{"code":"agent_not_found","message":"agent target nope:p0 not found"}}"#.utf8)
+        XCTAssertThrowsError(try HerdrProtocol.decodeResult(line, as: OkResult.self)) { error in
+            XCTAssertEqual((error as? HerdrError)?.code, "agent_not_found")
+        }
+    }
 }

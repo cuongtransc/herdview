@@ -88,6 +88,11 @@ struct AgentListView: View {
                                     .padding(.horizontal, Metrics.textInset)
                                     .cardSurface()
                             }
+                            if let error = store.jumpError {
+                                Notice(symbol: "exclamationmark.triangle.fill", text: error, tint: .orange)
+                                    .padding(.horizontal, Metrics.textInset)
+                                    .cardSurface()
+                            }
                             if store.hostOrder.isEmpty {
                                 Notice(symbol: "server.rack",
                                        text: "No hosts yet. Add one in \(ConfigLoader.defaultPath)")
@@ -108,7 +113,10 @@ struct AgentListView: View {
                                               agents: isFiltering ? (visibleByHost[host] ?? [])
                                                                   : store.agents(forHost: host),
                                               unreachable: store.unreachableHosts.contains(host),
-                                              now: context.date)
+                                              now: context.date,
+                                              canJump: store.canJump,
+                                              jumpingKey: store.jumpingKey,
+                                              onJump: { store.jumpAction?($0) })
                                 }
                             }
                             if isFiltering && result.hiddenCount > 0 {
@@ -223,6 +231,9 @@ private struct HostGroup: View {
     let agents: [TrackedAgent]
     let unreachable: Bool
     let now: Date
+    let canJump: Bool
+    let jumpingKey: String?
+    let onJump: (TrackedAgent) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -238,7 +249,8 @@ private struct HostGroup: View {
                     if index > 0 {
                         RowSeparator()
                     }
-                    AgentRow(agent: agent, now: now)
+                    AgentRow(agent: agent, now: now, canJump: canJump,
+                             isJumping: jumpingKey == agent.key, onJump: { onJump(agent) })
                         .padding(.horizontal, Metrics.cardInset)
                 }
             }
@@ -308,6 +320,16 @@ private struct AgentRow: View {
 
     let agent: TrackedAgent
     let now: Date
+    var canJump = false
+    var isJumping = false
+    var onJump: () -> Void = {}
+
+    @State private var isHovering = false
+
+    /// The title is a link while the pointer is on the row, and for as long
+    /// as a Jump to it runs — the row says it can be opened without a button
+    /// taking room from the name or the timer.
+    private var titleIsLink: Bool { canJump && (isHovering || isJumping) }
 
     var body: some View {
         let text = AgentTitles.rowText(for: agent)
@@ -318,20 +340,7 @@ private struct AgentRow: View {
                 // second line: it says which herd the agent belongs to, not
                 // what the agent is, so it rides beside the name rather than
                 // competing with it.
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(text.primary)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if let session = text.session {
-                        Text(session)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .layoutPriority(-1)
-                    }
-                }
+                titleLine(text)
                 Text(text.secondary)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -348,14 +357,68 @@ private struct AgentRow: View {
         .padding(.horizontal, Metrics.rowInset)
         .padding(.vertical, 8)
         .background(wash)
+        .background(hover)
+        // The whole row answers, not only its text: a double-click in the gap
+        // before the status pill is still a double-click on this Agent.
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: onJump)
+        .onHover { isHovering = $0 }
         .help(tooltip(for: text))
+    }
+
+    /// The row's first line — the directory with its session beside it, or the
+    /// session alone. While `titleIsLink` the whole line is one link in the
+    /// accent colour that Jumps on a single click: the widest target the row
+    /// has, and the directory and the session lead to the same place anyway.
+    /// No underline: the two parts differ in size, so an underline breaks in
+    /// two, and a list on macOS says "clickable" with colour and a hover
+    /// surface, not with a web link's rule.
+    /// A `Button` rather than a tap gesture, so the row's double-click does not
+    /// hold the click back while it waits to see whether a second one follows.
+    private func titleLine(_ text: AgentRowText) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if titleIsLink {
+                Button(action: onJump) {
+                    titleText(text)
+                }
+                .buttonStyle(TitleLinkStyle())
+            } else {
+                titleText(text)
+            }
+            if isJumping {
+                ProgressView()
+                    .controlSize(.mini)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            }
+        }
+    }
+
+    /// The session keeps the quiet type it had when it sat on the second line:
+    /// it says which herd the agent belongs to, not what the agent is, so it
+    /// rides beside the name rather than competing with it — and as a link it
+    /// stays the quieter half.
+    private func titleText(_ text: AgentRowText) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(text.primary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(titleIsLink ? Color.accentColor : Color.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let session = text.session {
+                Text(session)
+                    .font(.system(size: 11))
+                    .foregroundStyle(titleIsLink ? Color.accentColor.opacity(0.75) : Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(-1)
+            }
+        }
     }
 
     /// A blocked or done row blinks for as long as it stays that way — it is
     /// asking for a person, and it keeps asking until someone comes. Every
-    /// other row is plain. Rows do not light up under the pointer, because
-    /// clicking one does nothing and a hover highlight would promise that it
-    /// did.
+    /// other row is plain until the pointer is on it; then it lightens under
+    /// the wash, and its title turns into the link that Jumps to it.
     ///
     /// The inset is applied out here rather than inside the wash so that the
     /// layer being animated fills its own view exactly, with nothing between
@@ -364,6 +427,14 @@ private struct AgentRow: View {
     /// enough to keep two blinking neighbours apart.
     private var wash: some View {
         BlinkWash(status: agent.status)
+            .padding(.vertical, Metrics.washInset)
+    }
+
+    /// Only where a Jump can happen: lighting a row that cannot be opened
+    /// would promise something the click will not do.
+    private var hover: some View {
+        RoundedRectangle(cornerRadius: Metrics.washRadius, style: .continuous)
+            .fill(Color.primary.opacity(canJump && isHovering ? 0.06 : 0))
             .padding(.vertical, Metrics.washInset)
     }
 
@@ -392,6 +463,65 @@ private struct AgentRow: View {
         let lead = agent.info.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? text.primary
         guard let session = text.session else { return "\(lead)\n\(text.secondary)" }
         return "\(lead) · \(session)\n\(text.secondary)"
+    }
+}
+
+/// The title as a link: a chip of the accent colour appears behind it under the
+/// pointer and deepens while pressed, the way a toolbar button answers on
+/// macOS. The chip reaches a little past the text on every side and gives that
+/// room back, so the title never moves when it appears.
+private struct TitleLinkStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        TitleLink(configuration: configuration)
+    }
+
+    private struct TitleLink: View {
+        private static let bleed = EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 4)
+
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .padding(Self.bleed)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.opacity(configuration.isPressed ? 0.22 : hovering ? 0.12 : 0))
+                )
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .modifier(PointingHandCursor())
+                .padding(EdgeInsets(top: -Self.bleed.top, leading: -Self.bleed.leading,
+                                    bottom: -Self.bleed.bottom, trailing: -Self.bleed.trailing))
+        }
+    }
+}
+
+/// The pointing hand over a link, as a browser shows one.
+///
+/// A pushed cursor stays until it is popped, so the push is remembered: a link
+/// that goes away under the pointer — the Jump ends, the row leaves the list —
+/// pops what it pushed instead of leaving the hand behind for the whole app.
+private struct PointingHandCursor: ViewModifier {
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, !pushed {
+                    NSCursor.pointingHand.push()
+                    pushed = true
+                } else if !inside, pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
     }
 }
 
