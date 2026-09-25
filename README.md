@@ -60,7 +60,8 @@ that are asking for a person — so a glance at the window answers whether
 anything is waiting on you, and it keeps asking until you come. Every blinking
 row pulses in step.
 
-Double-click an agent's row to jump to it in [cmux](https://cmux.dev): its pane is
+Point at an agent's row and its session's name turns into a link: click it, or
+double-click anywhere on the row, to jump to the agent in [cmux](https://cmux.dev): its pane is
 focused inside Herdr, and the cmux tab attached to its session comes forward. With
 no such tab, a new one opens running `herdr session attach <session>` — over
 `ssh -t <ssh>` for a remote host. A tab counts as attached to a remote session when

@@ -72,11 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.monitor = monitor
         monitor.start()
 
-        let jumper = SessionJumper(hosts: config.hosts,
-                                   cmuxPath: config.cmuxPath ?? ConfigLoader.findCmux(),
-                                   store: store)
+        let cmuxPath = config.cmuxPath ?? ConfigLoader.findCmux()
+        let jumper = SessionJumper(hosts: config.hosts, cmuxPath: cmuxPath, store: store)
         self.jumper = jumper
         store.jumpAction = { [weak jumper] in jumper?.jump($0) }
+        store.canJump = cmuxPath != nil
 
         // Its first tick fetches at once, since the window was shown above.
         let quotaMonitor = QuotaMonitor(store: quotaStore) { [weak self] in

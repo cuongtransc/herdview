@@ -114,6 +114,8 @@ struct AgentListView: View {
                                                                   : store.agents(forHost: host),
                                               unreachable: store.unreachableHosts.contains(host),
                                               now: context.date,
+                                              canJump: store.canJump,
+                                              jumpingKey: store.jumpingKey,
                                               onJump: { store.jumpAction?($0) })
                                 }
                             }
@@ -229,6 +231,8 @@ private struct HostGroup: View {
     let agents: [TrackedAgent]
     let unreachable: Bool
     let now: Date
+    let canJump: Bool
+    let jumpingKey: String?
     let onJump: (TrackedAgent) -> Void
 
     var body: some View {
@@ -245,7 +249,8 @@ private struct HostGroup: View {
                     if index > 0 {
                         RowSeparator()
                     }
-                    AgentRow(agent: agent, now: now, onJump: { onJump(agent) })
+                    AgentRow(agent: agent, now: now, canJump: canJump,
+                             isJumping: jumpingKey == agent.key, onJump: { onJump(agent) })
                         .padding(.horizontal, Metrics.cardInset)
                 }
             }
@@ -315,7 +320,16 @@ private struct AgentRow: View {
 
     let agent: TrackedAgent
     let now: Date
+    var canJump = false
+    var isJumping = false
     var onJump: () -> Void = {}
+
+    @State private var isHovering = false
+
+    /// The session's name is a link while the pointer is on the row, and for
+    /// as long as a Jump to it runs — the one place the row says it can be
+    /// opened, without a button taking room from the name or the timer.
+    private var sessionIsLink: Bool { canJump && (isHovering || isJumping) }
 
     var body: some View {
         let text = AgentTitles.rowText(for: agent)
@@ -327,16 +341,18 @@ private struct AgentRow: View {
                 // what the agent is, so it rides beside the name rather than
                 // competing with it.
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(text.primary)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if let session = text.session {
-                        Text(session)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                    // With no working directory the session leads the row,
+                    // and it is that line that turns into the link.
+                    if text.session == nil {
+                        name(text.primary, font: .system(size: 13, weight: .medium), quiet: false)
+                    } else {
+                        Text(text.primary)
+                            .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                             .truncationMode(.middle)
+                    }
+                    if let session = text.session {
+                        name(session, font: .system(size: 11), quiet: true)
                             .layoutPriority(-1)
                     }
                 }
@@ -356,18 +372,52 @@ private struct AgentRow: View {
         .padding(.horizontal, Metrics.rowInset)
         .padding(.vertical, 8)
         .background(wash)
+        .background(hover)
         // The whole row answers, not only its text: a double-click in the gap
         // before the status pill is still a double-click on this Agent.
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onJump)
+        .onHover { isHovering = $0 }
         .help(tooltip(for: text))
+    }
+
+    /// The session's name: quiet text, or — while `sessionIsLink` — a link in
+    /// the accent colour that Jumps on a single click. A `Button` rather than a
+    /// tap gesture, so the row's double-click does not hold the click back
+    /// while it waits to see whether a second one follows.
+    @ViewBuilder
+    private func name(_ string: String, font: Font, quiet: Bool) -> some View {
+        if sessionIsLink {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Button(action: onJump) {
+                    Text(string)
+                        .font(font)
+                        .foregroundStyle(Color.accentColor)
+                        .underline()
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .buttonStyle(.plain)
+                .modifier(PointingHandCursor())
+                if isJumping {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                }
+            }
+        } else {
+            Text(string)
+                .font(font)
+                .foregroundStyle(quiet ? Color.secondary : Color.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
     }
 
     /// A blocked or done row blinks for as long as it stays that way — it is
     /// asking for a person, and it keeps asking until someone comes. Every
-    /// other row is plain. Rows do not light up under the pointer: a single
-    /// click does nothing, and a hover highlight would promise that it did.
-    /// A double-click Jumps to the Agent, which the tooltip says.
+    /// other row is plain until the pointer is on it; then it lightens under
+    /// the wash, and its session's name turns into the link that Jumps to it.
     ///
     /// The inset is applied out here rather than inside the wash so that the
     /// layer being animated fills its own view exactly, with nothing between
@@ -376,6 +426,14 @@ private struct AgentRow: View {
     /// enough to keep two blinking neighbours apart.
     private var wash: some View {
         BlinkWash(status: agent.status)
+            .padding(.vertical, Metrics.washInset)
+    }
+
+    /// Only where a Jump can happen: lighting a row that cannot be opened
+    /// would promise something the click will not do.
+    private var hover: some View {
+        RoundedRectangle(cornerRadius: Metrics.washRadius, style: .continuous)
+            .fill(Color.primary.opacity(canJump && isHovering ? 0.06 : 0))
             .padding(.vertical, Metrics.washInset)
     }
 
@@ -402,9 +460,37 @@ private struct AgentRow: View {
     /// is the one the row shortens to its last component.
     private func tooltip(for text: AgentRowText) -> String {
         let lead = agent.info.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? text.primary
-        let hint = "Double-click to open in cmux"
+        let hint = "Click the session, or double-click the row, to open it in cmux"
         guard let session = text.session else { return "\(lead)\n\(text.secondary)\n\(hint)" }
         return "\(lead) · \(session)\n\(text.secondary)\n\(hint)"
+    }
+}
+
+/// The pointing hand over a link, as a browser shows one.
+///
+/// A pushed cursor stays until it is popped, so the push is remembered: a link
+/// that goes away under the pointer — the Jump ends, the row leaves the list —
+/// pops what it pushed instead of leaving the hand behind for the whole app.
+private struct PointingHandCursor: ViewModifier {
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, !pushed {
+                    NSCursor.pointingHand.push()
+                    pushed = true
+                } else if !inside, pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
     }
 }
 

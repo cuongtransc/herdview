@@ -39,10 +39,14 @@ final class SessionJumper {
             return
         }
         running = true
+        store.jumpingKey = agent.key
         store.showJumpError(nil)
         let socketPath = store.socketPath(host: agent.host, session: agent.session)
         Task {
-            defer { running = false }
+            defer {
+                running = false
+                store.jumpingKey = nil
+            }
             await focusPane(agent, socketPath: socketPath)
             do {
                 try await bringSessionForward(host: host, session: agent.session, cmux: cmux)

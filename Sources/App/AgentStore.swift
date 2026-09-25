@@ -13,6 +13,12 @@ final class AgentStore: ObservableObject {
     /// What a double-click on an Agent's row does. Set once the config is read;
     /// nil (the UI shots) makes the double-click do nothing.
     var jumpAction: ((TrackedAgent) -> Void)?
+    /// Whether a Jump can reach cmux at all. A session name only turns into a
+    /// link when it can: a link that could only fail would be a lie.
+    @Published var canJump = false
+    /// The Agent whose Jump is running, by `TrackedAgent.key`, so its row can
+    /// say so after the pointer has left it.
+    @Published var jumpingKey: String?
     /// Why the last Jump failed, shown above the list until it clears itself.
     @Published private(set) var jumpError: String?
     private var jumpErrorClear: Task<Void, Never>?
