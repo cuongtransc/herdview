@@ -13,10 +13,8 @@ public struct JumpTiming: Codable, Equatable, Sendable {
 
     /// What the Jump did. A failed one stops part way, so its steps are not
     /// comparable with the others'.
-    public enum Outcome: Equatable, Sendable {
-        case focus
-        case open
-        case failed(String)
+    public enum Outcome: String, Codable, Sendable {
+        case focus, open, failed
     }
 
     public struct Step: Codable, Equatable, Sendable {
@@ -32,49 +30,22 @@ public struct JumpTiming: Codable, Equatable, Sendable {
     public let at: Date
     public let source: Source
     public let outcome: Outcome
+    /// Why it failed, when it did.
+    public let error: String?
     /// cmux terminal tabs open at the time; the `ps` and `tree` costs grow with it.
     public let tabs: Int?
     public let steps: [Step]
 
-    public init(at: Date, source: Source, outcome: Outcome, tabs: Int?, steps: [Step]) {
+    public init(at: Date, source: Source, outcome: Outcome, error: String? = nil, tabs: Int?, steps: [Step]) {
         self.at = at
         self.source = source
         self.outcome = outcome
+        self.error = error
         self.tabs = tabs
         self.steps = steps
     }
 
     public var totalMs: Double { steps.reduce(0) { $0 + $1.ms } }
-
-    private enum CodingKeys: String, CodingKey { case at, source, outcome, error, tabs, steps }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        at = try c.decode(Date.self, forKey: .at)
-        source = try c.decode(Source.self, forKey: .source)
-        tabs = try c.decodeIfPresent(Int.self, forKey: .tabs)
-        steps = try c.decode([Step].self, forKey: .steps)
-        switch try c.decode(String.self, forKey: .outcome) {
-        case "focus": outcome = .focus
-        case "open": outcome = .open
-        default: outcome = .failed(try c.decodeIfPresent(String.self, forKey: .error) ?? "")
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(at, forKey: .at)
-        try c.encode(source, forKey: .source)
-        try c.encodeIfPresent(tabs, forKey: .tabs)
-        try c.encode(steps, forKey: .steps)
-        switch outcome {
-        case .focus: try c.encode("focus", forKey: .outcome)
-        case .open: try c.encode("open", forKey: .outcome)
-        case .failed(let error):
-            try c.encode("failed", forKey: .outcome)
-            try c.encode(error, forKey: .error)
-        }
-    }
 
     /// Times the steps of one Jump, each from the end of the one before.
     public struct Recorder: Sendable {
@@ -127,7 +98,7 @@ public struct JumpTiming: Codable, Equatable, Sendable {
         var totals: [Double] = []
         var failed = 0
         for record in records {
-            if case .failed = record.outcome {
+            if record.outcome == .failed {
                 failed += 1
                 continue
             }

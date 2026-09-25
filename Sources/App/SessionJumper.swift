@@ -12,7 +12,7 @@ import HerdviewCore
 @MainActor
 final class SessionJumper {
     private static let timeoutSeconds: Double = 5
-    nonisolated private static let cmuxBundleId = "com.cmuxterm.app"
+    private static let cmuxBundleId = "com.cmuxterm.app"
     private static let ps = HostCommand(executable: "/bin/ps", arguments: ["-axo", "pid=,tty=,command="])
 
     private enum JumpError: Error, CustomStringConvertible {
@@ -64,24 +64,26 @@ final class SessionJumper {
             if let clickMs { recorder.prepend("click", ms: clickMs) }
             await focusPane(agent, socketPath: socketPath)
             recorder.lap("focus pane")
-            var outcome = JumpTiming.Outcome.failed("")
+            var outcome = JumpTiming.Outcome.failed
+            var failure: String?
             var tabs: Int?
-            var cameForward: Task<Bool, Never>?
+            var activated = false
             do {
                 let result = try await bringSessionForward(host: host, session: agent.session, cmux: cmux,
                                                            recorder: &recorder)
                 outcome = result.outcome
                 tabs = result.tabs
-                cameForward = cmuxCameForward()
                 activateCmux()
+                activated = true
             } catch {
-                outcome = .failed(String(describing: error))
+                outcome = .failed
+                failure = String(describing: error)
                 store.showJumpError(String(describing: error))
             }
             running = false
             store.jumpingKey = nil
-            if let cameForward, await cameForward.value { recorder.lap("cmux to front") }
-            let timing = JumpTiming(at: Date(), source: source, outcome: outcome, tabs: tabs, steps: recorder.steps)
+            if activated, await waitForCmuxInFront() { recorder.lap("cmux to front") }
+            let timing = JumpTiming(at: Date(), source: source, outcome: outcome, error: failure, tabs: tabs, steps: recorder.steps)
             let log = timingLog
             await Task.detached(priority: .utility) {
                 do { try log.append(timing) } catch {
@@ -99,33 +101,14 @@ final class SessionJumper {
         return (ProcessInfo.processInfo.systemUptime - event.timestamp) * 1000
     }
 
-    /// True once cmux is the active app — at once if it already is — false
-    /// after `frontmostTimeout`. Set up before cmux is asked to activate so
-    /// the notification cannot slip past.
-    private func cmuxCameForward() -> Task<Bool, Never> {
-        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.cmuxBundleId {
-            return Task { true }
+    /// True once cmux is the active app, false after `frontmostTimeout`.
+    private func waitForCmuxInFront() async -> Bool {
+        let deadline = ContinuousClock.now + Self.frontmostTimeout
+        while ContinuousClock.now < deadline {
+            if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.cmuxBundleId { return true }
+            try? await Task.sleep(for: .milliseconds(10))
         }
-        let center = NSWorkspace.shared.notificationCenter
-        let activations = center.notifications(named: NSWorkspace.didActivateApplicationNotification)
-        return Task {
-            await withTaskGroup(of: Bool.self) { group in
-                group.addTask {
-                    for await note in activations {
-                        let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-                        if app?.bundleIdentifier == Self.cmuxBundleId { return true }
-                    }
-                    return false
-                }
-                group.addTask {
-                    try? await Task.sleep(for: Self.frontmostTimeout)
-                    return false
-                }
-                let first = await group.next() ?? false
-                group.cancelAll()
-                return first
-            }
-        }
+        return false
     }
 
     /// Best effort: the Agent may have exited since the list was drawn, and
