@@ -26,4 +26,17 @@ public enum CmuxCommand {
         }
         return HostCommand(executable: cmux, arguments: arguments)
     }
+
+    /// What a failed cmux call says to the person: its last stderr line, or
+    /// how to fix the one refusal every Dock-launched Herdview meets — cmux's
+    /// default socket mode admits only processes started inside cmux.
+    public static func failure(stderr: String, exitCode: Int32) -> String {
+        if stderr.contains("only processes started inside cmux") {
+            return "cmux only lets in apps started inside it — set Settings › Automation to Password, or run `mise run cmux:setup`"
+        }
+        let last = stderr.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .last { !$0.isEmpty }
+        return last ?? "exit \(exitCode)"
+    }
 }

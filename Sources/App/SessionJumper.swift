@@ -92,9 +92,7 @@ final class SessionJumper {
             case .launchFailed(let why):
                 throw JumpError.cmux(label, why)
             case .nonZeroExit(let code, let stderr):
-                let last = stderr.split(whereSeparator: \.isNewline).last
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                throw JumpError.cmux(label, last ?? "exit \(code)")
+                throw JumpError.cmux(label, CmuxCommand.failure(stderr: stderr, exitCode: code))
             }
         }
     }

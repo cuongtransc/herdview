@@ -50,6 +50,10 @@ echo "installed: $DEST"
 open "$DEST"
 """
 
+[tasks."cmux:setup"]
+description = "Let Herdview opened from the Dock drive cmux (socket password mode)"
+run = "./scripts/cmux-setup.sh"
+
 [tasks.test]
 description = "Run the unit tests"
 run = "swift test"

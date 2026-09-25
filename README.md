@@ -70,6 +70,12 @@ its command names the host's `ssh` value exactly, so a tab you opened with
 opens instead. Herdview finds cmux in `/opt/homebrew/bin`, `/usr/local/bin` or
 `cmux.app`; set `cmux_path` above the first `[[hosts]]` if it lives elsewhere.
 
+cmux admits only processes started inside it by default, so a Herdview opened from
+the Dock or Finder is refused. Run `mise run cmux:setup` once: it switches cmux's
+socket to password mode with a random password in `~/.config/cmux/cmux.json`
+(backing the file up first) and reloads cmux. Or set Settings › Automation to
+Password by hand.
+
 The list scrolls and the host headings stay put as it does. The window remembers
 where you put it and how big you made it. `Keep on Top` in the Window menu
 (⌘T) makes it float above other apps' windows so the herd stays readable while
