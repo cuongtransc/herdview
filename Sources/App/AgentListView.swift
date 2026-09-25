@@ -370,6 +370,9 @@ private struct AgentRow: View {
     /// session alone. While `titleIsLink` the whole line is one link in the
     /// accent colour that Jumps on a single click: the widest target the row
     /// has, and the directory and the session lead to the same place anyway.
+    /// No underline: the two parts differ in size, so an underline breaks in
+    /// two, and a list on macOS says "clickable" with colour and a hover
+    /// surface, not with a web link's rule.
     /// A `Button` rather than a tap gesture, so the row's double-click does not
     /// hold the click back while it waits to see whether a second one follows.
     private func titleLine(_ text: AgentRowText) -> some View {
@@ -377,10 +380,8 @@ private struct AgentRow: View {
             if titleIsLink {
                 Button(action: onJump) {
                     titleText(text)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .modifier(PointingHandCursor())
+                .buttonStyle(TitleLinkStyle())
             } else {
                 titleText(text)
             }
@@ -400,14 +401,12 @@ private struct AgentRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(text.primary)
                 .font(.system(size: 13, weight: .medium))
-                .underline(titleIsLink)
                 .foregroundStyle(titleIsLink ? Color.accentColor : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             if let session = text.session {
                 Text(session)
                     .font(.system(size: 11))
-                    .underline(titleIsLink)
                     .foregroundStyle(titleIsLink ? Color.accentColor.opacity(0.75) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -465,6 +464,37 @@ private struct AgentRow: View {
         let hint = "Click the name, or double-click the row, to open it in cmux"
         guard let session = text.session else { return "\(lead)\n\(text.secondary)\n\(hint)" }
         return "\(lead) · \(session)\n\(text.secondary)\n\(hint)"
+    }
+}
+
+/// The title as a link: a chip of the accent colour appears behind it under the
+/// pointer and deepens while pressed, the way a toolbar button answers on
+/// macOS. The chip reaches a little past the text on every side and gives that
+/// room back, so the title never moves when it appears.
+private struct TitleLinkStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        TitleLink(configuration: configuration)
+    }
+
+    private struct TitleLink: View {
+        private static let bleed = EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 4)
+
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .padding(Self.bleed)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.opacity(configuration.isPressed ? 0.22 : hovering ? 0.12 : 0))
+                )
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .modifier(PointingHandCursor())
+                .padding(EdgeInsets(top: -Self.bleed.top, leading: -Self.bleed.leading,
+                                    bottom: -Self.bleed.bottom, trailing: -Self.bleed.trailing))
+        }
     }
 }
 

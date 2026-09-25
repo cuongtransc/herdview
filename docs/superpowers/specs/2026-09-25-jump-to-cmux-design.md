@@ -18,7 +18,8 @@ In:
 
 - Double-click on an Agent row starts a Jump.
 - Hover: the row lightens and its whole title line (directory and session) turns into
-  one link (accent colour, underline, pointing hand, no icon); a single click on it starts a Jump. While a Jump
+  one link: accent colour, no underline (two type sizes break it in two), and a
+  rounded accent chip behind it with a pointing hand while the pointer is on it — no icon; a single click on it starts a Jump. While a Jump
   runs, the title stays a link with a small spinner at its end. With no cmux, neither
   happens. (Revised 2026-09-25 after a mockup review; the first cut had no hover state.)
 - Focus the Agent's pane with Herdr's `agent.focus` over the socket Herdview already
