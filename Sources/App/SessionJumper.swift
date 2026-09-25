@@ -6,10 +6,13 @@ import HerdviewCore
 ///
 /// One Jump at a time. A double-click that lands while the last one is still
 /// asking cmux would otherwise see no tab yet and open a second one.
+///
+/// Every Jump appends its step timings to `JumpTimingLog`; `herdview
+/// --jump-stats` reads them back as percentiles.
 @MainActor
 final class SessionJumper {
     private static let timeoutSeconds: Double = 5
-    private static let cmuxBundleId = "com.cmuxterm.app"
+    nonisolated private static let cmuxBundleId = "com.cmuxterm.app"
     private static let ps = HostCommand(executable: "/bin/ps", arguments: ["-axo", "pid=,tty=,command="])
 
     private enum JumpError: Error, CustomStringConvertible {
@@ -21,38 +24,106 @@ final class SessionJumper {
         }
     }
 
+    /// How long a Jump waits to see cmux come to the front before it stops
+    /// timing that step; past it the step is left out, not recorded as slow.
+    private static let frontmostTimeout: Duration = .seconds(5)
+
     private let hosts: [String: HostConfig]
     private let cmuxPath: String?
     private let store: AgentStore
+    private let timingLog: JumpTimingLog
+    /// The tab each Session was last opened in, for a tab cmux gives no tty.
+    private var tabs: JumpTabs
     private var running = false
 
-    init(hosts: [HostConfig], cmuxPath: String?, store: AgentStore) {
+    init(hosts: [HostConfig], cmuxPath: String?, store: AgentStore, timingLog: JumpTimingLog = JumpTimingLog()) {
         self.hosts = Dictionary(hosts.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         self.cmuxPath = cmuxPath
         self.store = store
+        self.timingLog = timingLog
+        self.tabs = JumpTabs.load()
     }
 
-    func jump(_ agent: TrackedAgent) {
-        guard !running, let host = hosts[agent.host] else { return }
+    /// Starts a Jump; the returned task ends once its timing is written, which
+    /// is after cmux came to the front or `frontmostTimeout`. Nil when no Jump
+    /// started. The next Jump can start before then.
+    @discardableResult
+    func jump(_ agent: TrackedAgent, source: JumpTiming.Source = .click) -> Task<Void, Never>? {
+        let clickMs = source == .click ? Self.clickAgeMs() : nil
+        guard !running, let host = hosts[agent.host] else { return nil }
         guard let cmux = cmuxPath else {
             store.showJumpError("cmux not found — set cmux_path in \(ConfigLoader.defaultPath)")
-            return
+            return nil
         }
         running = true
         store.jumpingKey = agent.key
         store.showJumpError(nil)
         let socketPath = store.socketPath(host: agent.host, session: agent.session)
-        Task {
-            defer {
-                running = false
-                store.jumpingKey = nil
-            }
+        return Task {
+            var recorder = JumpTiming.Recorder()
+            if let clickMs { recorder.prepend("click", ms: clickMs) }
             await focusPane(agent, socketPath: socketPath)
+            recorder.lap("focus pane")
+            var outcome = JumpTiming.Outcome.failed("")
+            var tabs: Int?
+            var cameForward: Task<Bool, Never>?
             do {
-                try await bringSessionForward(host: host, session: agent.session, cmux: cmux)
+                let result = try await bringSessionForward(host: host, session: agent.session, cmux: cmux,
+                                                           recorder: &recorder)
+                outcome = result.outcome
+                tabs = result.tabs
+                cameForward = cmuxCameForward()
                 activateCmux()
             } catch {
+                outcome = .failed(String(describing: error))
                 store.showJumpError(String(describing: error))
+            }
+            running = false
+            store.jumpingKey = nil
+            if let cameForward, await cameForward.value { recorder.lap("cmux to front") }
+            let timing = JumpTiming(at: Date(), source: source, outcome: outcome, tabs: tabs, steps: recorder.steps)
+            let log = timingLog
+            await Task.detached(priority: .utility) {
+                do { try log.append(timing) } catch {
+                    NSLog("herdview: could not write %@: %@", log.path, String(describing: error))
+                }
+            }.value
+        }
+    }
+
+    /// From the click that started this Jump to now, when AppKit is handling
+    /// that click; nil for anything else, such as a key press.
+    private static func clickAgeMs() -> Double? {
+        guard let event = NSApp.currentEvent,
+              [.leftMouseDown, .leftMouseUp].contains(event.type) else { return nil }
+        return (ProcessInfo.processInfo.systemUptime - event.timestamp) * 1000
+    }
+
+    /// True once cmux is the active app — at once if it already is — false
+    /// after `frontmostTimeout`. Set up before cmux is asked to activate so
+    /// the notification cannot slip past.
+    private func cmuxCameForward() -> Task<Bool, Never> {
+        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.cmuxBundleId {
+            return Task { true }
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        let activations = center.notifications(named: NSWorkspace.didActivateApplicationNotification)
+        return Task {
+            await withTaskGroup(of: Bool.self) { group in
+                group.addTask {
+                    for await note in activations {
+                        let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                        if app?.bundleIdentifier == Self.cmuxBundleId { return true }
+                    }
+                    return false
+                }
+                group.addTask {
+                    try? await Task.sleep(for: Self.frontmostTimeout)
+                    return false
+                }
+                let first = await group.next() ?? false
+                group.cancelAll()
+                return first
             }
         }
     }
@@ -70,17 +141,43 @@ final class SessionJumper {
         }
     }
 
-    private func bringSessionForward(host: HostConfig, session: String, cmux: String) async throws {
+    private func bringSessionForward(host: HostConfig, session: String, cmux: String,
+                                     recorder: inout JumpTiming.Recorder) async throws -> (outcome: JumpTiming.Outcome, tabs: Int) {
+        // Side by side: each takes about a quarter second and neither needs
+        // the other. Without a process list no tab can be recognised; a new
+        // tab is still a Jump.
+        async let processes = try? ProcessRunner.run(Self.ps, timeoutSeconds: Self.timeoutSeconds)
         let layout = try CmuxLayout.parse(tree: try await run(CmuxCommand.tree(cmux: cmux), label: "tree"))
-        // Without a process list no tab can be recognised; a new tab is still a Jump.
-        let psOutput = try? await ProcessRunner.run(Self.ps, timeoutSeconds: Self.timeoutSeconds)
+        recorder.lap("cmux tree")
+        let psOutput = await processes
+        // Only what is left of ps once the tree is in: the two run side by side.
+        recorder.lap("ps wait")
         let clients = AttachClient.parse(ps: psOutput.flatMap { String(data: $0, encoding: .utf8) } ?? "")
-        switch Jump.route(host: host, session: session, clients: clients, layout: layout) {
+        let remembered = tabs.surface(host: host.name, session: session)
+        switch Jump.route(host: host, session: session, clients: clients, layout: layout, remembered: remembered) {
         case .focus(let surface):
             _ = try await run(CmuxCommand.focus(cmux: cmux, surface: surface), label: "focus-panel")
+            recorder.lap("cmux focus-panel")
+            return (.focus, layout.surfaces.count)
         case .open:
             let attach = HostCommand.attach(for: host, session: session).shellLine
-            _ = try await run(CmuxCommand.open(cmux: cmux, layout: layout, command: attach), label: "new-surface")
+            let output = try await run(CmuxCommand.open(cmux: cmux, layout: layout, command: attach), label: "new-surface")
+            recorder.lap("cmux new-surface")
+            if let opened = CmuxCommand.openedSurfaceId(output: String(decoding: output, as: UTF8.self)) {
+                tabs.remember(opened, host: host.name, session: session)
+                saveTabs()
+            } else if remembered != nil {
+                // The tab it remembered is closed; a stale id only costs a lookup, but it is wrong.
+                tabs.forget(host: host.name, session: session)
+                saveTabs()
+            }
+            return (.open, layout.surfaces.count)
+        }
+    }
+
+    private func saveTabs() {
+        do { try tabs.save() } catch {
+            NSLog("herdview: could not write %@: %@", tabs.path, String(describing: error))
         }
     }
 

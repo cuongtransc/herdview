@@ -16,6 +16,6 @@ final class CmuxCommandTests: XCTestCase {
     func testAccessDeniedSaysHowToLetHerdviewIn() {
         let stderr = "Error: ERROR: Access denied - only processes started inside cmux can connect\n"
         XCTAssertEqual(CmuxCommand.failure(stderr: stderr, exitCode: 1),
-                       "cmux only lets in apps started inside it — set Settings › Automation to Password, or run `mise run cmux:setup`")
+                       "cmux only lets in apps started inside it — set Settings › Automation › Socket Control Mode to Automation mode, or run `mise run cmux:setup`")
     }
 }

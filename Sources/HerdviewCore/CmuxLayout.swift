@@ -11,15 +11,19 @@ public enum CmuxError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// One terminal tab in cmux. The tty is what ties it to a Herdr client.
+/// One terminal tab in cmux. The tty is what ties it to a Herdr client; a tab
+/// cmux reports no tty for can still be found by the `id` Herdview remembered
+/// when it opened it.
 public struct CmuxSurface: Equatable, Sendable {
     public let ref: String
-    public let tty: String
+    public let id: String?
+    public let tty: String?
     public let workspaceRef: String
     public let windowRef: String
 
-    public init(ref: String, tty: String, workspaceRef: String, windowRef: String) {
+    public init(ref: String, id: String? = nil, tty: String?, workspaceRef: String, windowRef: String) {
         self.ref = ref
+        self.id = id
         self.tty = tty
         self.workspaceRef = workspaceRef
         self.windowRef = windowRef
@@ -54,14 +58,16 @@ public struct CmuxLayout: Equatable, Sendable {
         struct Window: Decodable { let ref: String; let workspaces: [Workspace]? }
         struct Workspace: Decodable { let ref: String; let panes: [Pane]? }
         struct Pane: Decodable { let surfaces: [Surface]? }
-        struct Surface: Decodable { let ref: String; let tty: String? }
+        struct Surface: Decodable { let ref: String; let id: String?; let tty: String?; let type: String? }
 
         let active: Active?
         let windows: [Window]
     }
 
-    /// Parses `cmux tree --all --json`. Surfaces without a terminal (browser
-    /// tabs and the like) are left out: nothing can be attached to them.
+    /// Parses `cmux tree --all --json`. Surfaces that are not terminals
+    /// (browser tabs and the like) are left out: nothing can be attached to
+    /// them. A terminal with no tty is kept — cmux 0.64 stopped reporting one
+    /// for new tabs, Herdview's own among them.
     public static func parse(tree data: Data) throws -> CmuxLayout {
         let tree: Tree
         do {
@@ -74,8 +80,10 @@ public struct CmuxLayout: Equatable, Sendable {
             for workspace in window.workspaces ?? [] {
                 for pane in workspace.panes ?? [] {
                     for surface in pane.surfaces ?? [] {
-                        guard let tty = surface.tty, !tty.isEmpty else { continue }
-                        surfaces.append(CmuxSurface(ref: surface.ref, tty: tty,
+                        let tty = surface.tty.flatMap { $0.isEmpty ? nil : $0 }
+                        // An older cmux gave no type; there only a tty said "terminal".
+                        guard surface.type.map({ $0 == "terminal" }) ?? (tty != nil) else { continue }
+                        surfaces.append(CmuxSurface(ref: surface.ref, id: surface.id, tty: tty,
                                                     workspaceRef: workspace.ref, windowRef: window.ref))
                     }
                 }
