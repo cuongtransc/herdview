@@ -326,10 +326,10 @@ private struct AgentRow: View {
 
     @State private var isHovering = false
 
-    /// The session's name is a link while the pointer is on the row, and for
-    /// as long as a Jump to it runs — the one place the row says it can be
-    /// opened, without a button taking room from the name or the timer.
-    private var sessionIsLink: Bool { canJump && (isHovering || isJumping) }
+    /// The title is a link while the pointer is on the row, and for as long
+    /// as a Jump to it runs — the row says it can be opened without a button
+    /// taking room from the name or the timer.
+    private var titleIsLink: Bool { canJump && (isHovering || isJumping) }
 
     var body: some View {
         let text = AgentTitles.rowText(for: agent)
@@ -340,22 +340,7 @@ private struct AgentRow: View {
                 // second line: it says which herd the agent belongs to, not
                 // what the agent is, so it rides beside the name rather than
                 // competing with it.
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    // With no working directory the session leads the row,
-                    // and it is that line that turns into the link.
-                    if text.session == nil {
-                        name(text.primary, font: .system(size: 13, weight: .medium), quiet: false)
-                    } else {
-                        Text(text.primary)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    if let session = text.session {
-                        name(session, font: .system(size: 11), quiet: true)
-                            .layoutPriority(-1)
-                    }
-                }
+                titleLine(text)
                 Text(text.secondary)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -381,43 +366,60 @@ private struct AgentRow: View {
         .help(tooltip(for: text))
     }
 
-    /// The session's name: quiet text, or — while `sessionIsLink` — a link in
-    /// the accent colour that Jumps on a single click. A `Button` rather than a
-    /// tap gesture, so the row's double-click does not hold the click back
-    /// while it waits to see whether a second one follows.
-    @ViewBuilder
-    private func name(_ string: String, font: Font, quiet: Bool) -> some View {
-        if sessionIsLink {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+    /// The row's first line — the directory with its session beside it, or the
+    /// session alone. While `titleIsLink` the whole line is one link in the
+    /// accent colour that Jumps on a single click: the widest target the row
+    /// has, and the directory and the session lead to the same place anyway.
+    /// A `Button` rather than a tap gesture, so the row's double-click does not
+    /// hold the click back while it waits to see whether a second one follows.
+    private func titleLine(_ text: AgentRowText) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if titleIsLink {
                 Button(action: onJump) {
-                    Text(string)
-                        .font(font)
-                        .foregroundStyle(Color.accentColor)
-                        .underline()
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    titleText(text)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .modifier(PointingHandCursor())
-                if isJumping {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
-                }
+            } else {
+                titleText(text)
             }
-        } else {
-            Text(string)
-                .font(font)
-                .foregroundStyle(quiet ? Color.secondary : Color.primary)
+            if isJumping {
+                ProgressView()
+                    .controlSize(.mini)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            }
+        }
+    }
+
+    /// The session keeps the quiet type it had when it sat on the second line:
+    /// it says which herd the agent belongs to, not what the agent is, so it
+    /// rides beside the name rather than competing with it — and as a link it
+    /// stays the quieter half.
+    private func titleText(_ text: AgentRowText) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(text.primary)
+                .font(.system(size: 13, weight: .medium))
+                .underline(titleIsLink)
+                .foregroundStyle(titleIsLink ? Color.accentColor : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if let session = text.session {
+                Text(session)
+                    .font(.system(size: 11))
+                    .underline(titleIsLink)
+                    .foregroundStyle(titleIsLink ? Color.accentColor.opacity(0.75) : Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(-1)
+            }
         }
     }
 
     /// A blocked or done row blinks for as long as it stays that way — it is
     /// asking for a person, and it keeps asking until someone comes. Every
     /// other row is plain until the pointer is on it; then it lightens under
-    /// the wash, and its session's name turns into the link that Jumps to it.
+    /// the wash, and its title turns into the link that Jumps to it.
     ///
     /// The inset is applied out here rather than inside the wash so that the
     /// layer being animated fills its own view exactly, with nothing between
@@ -460,7 +462,7 @@ private struct AgentRow: View {
     /// is the one the row shortens to its last component.
     private func tooltip(for text: AgentRowText) -> String {
         let lead = agent.info.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? text.primary
-        let hint = "Click the session, or double-click the row, to open it in cmux"
+        let hint = "Click the name, or double-click the row, to open it in cmux"
         guard let session = text.session else { return "\(lead)\n\(text.secondary)\n\(hint)" }
         return "\(lead) · \(session)\n\(text.secondary)\n\(hint)"
     }

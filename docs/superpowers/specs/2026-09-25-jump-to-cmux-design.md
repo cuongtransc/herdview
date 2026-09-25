@@ -17,9 +17,9 @@ Works for every Host: local Sessions and Sessions on remote Hosts over SSH.
 In:
 
 - Double-click on an Agent row starts a Jump.
-- Hover: the row lightens and the session's name turns into a link (accent colour,
-  underline, pointing hand, no icon); a single click on it starts a Jump. While a Jump
-  runs, the name stays a link with a small spinner beside it. With no cmux, neither
+- Hover: the row lightens and its whole title line (directory and session) turns into
+  one link (accent colour, underline, pointing hand, no icon); a single click on it starts a Jump. While a Jump
+  runs, the title stays a link with a small spinner at its end. With no cmux, neither
   happens. (Revised 2026-09-25 after a mockup review; the first cut had no hover state.)
 - Focus the Agent's pane with Herdr's `agent.focus` over the socket Herdview already
   holds for the Session (local socket, or the SSH-forwarded one for a remote Host).
@@ -33,7 +33,7 @@ Out:
   Jump reports it and does nothing else.
 - A configurable attach command.
 - Jumping from a Notification or the menu bar item.
-- Single click anywhere but the session's name does nothing.
+- Single click anywhere but the title does nothing.
 
 ## Probe (2026-09-25, `ct-hms-lan`, Session `wd-bmf`, herdr 0.9.1)
 
@@ -110,8 +110,7 @@ Off the main thread:
 4. Activate `cmux.app`.
 
 **`AgentListView`** — the Agent row gets a double-click gesture that calls the jumper,
-a hover state that lightens it and turns the session's name into a `Button` link (the
-primary line when the session leads the row), and a tooltip hint. `AgentStore` carries
+a hover state that lightens it and turns the title line into one `Button` link, and a tooltip hint. `AgentStore` carries
 `canJump` and `jumpingKey` for it.
 
 ## Errors
