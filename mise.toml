@@ -2,25 +2,53 @@
 # Run `mise trust` once so mise will load this file.
 
 # The bundle id is fixed, so `open` on a fresh build while any Herdview is
-# running only brings the old one forward. Quit it first, and wait for it to go.
+# running only brings the old one forward. Every task that opens a new build
+# quits the running one first, through `app:quit`.
+[tasks."app:quit"]
+description = "Quit a running Herdview and wait for it to exit"
+hide = true
+run = """
+pgrep -x herdview >/dev/null || exit 0
+osascript -e 'tell application id "com.herdview.app" to quit'
+for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x herdview >/dev/null || exit 0; sleep 0.5; done
+echo "a running Herdview would not quit; quit it and retry" >&2
+exit 1
+"""
+
 [tasks.dev]
 description = "Build a debug Herdview.app and (re)launch it"
 run = """
 ./scripts/build-app.sh debug
-if pgrep -x herdview >/dev/null; then
-  osascript -e 'tell application id "com.herdview.app" to quit'
-  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x herdview >/dev/null || break; sleep 0.5; done
-  if pgrep -x herdview >/dev/null; then
-    echo "a running Herdview would not quit; quit it and retry" >&2
-    exit 1
-  fi
-fi
+mise run app:quit
 open build/Herdview.app
 """
 
 [tasks.build]
 description = "Build build/Herdview.app (release); CONFIG=debug for unoptimised"
-run = "./scripts/build-app.sh ${CONFIG:-release}"
+usage = 'flag "--reveal" help="Show the built app in Finder afterwards"'
+run = """
+./scripts/build-app.sh ${CONFIG:-release}
+[ "${usage_reveal:-false}" = "true" ] && open -R build/Herdview.app
+exit 0
+"""
+
+# Not `install`: that name is reserved for dependency sync, and `mise install`
+# always runs mise's own tool installer instead of a task. The copy is a
+# replace, not a merge — `ditto` into a bundle that already exists would leave
+# files the new build no longer has.
+[tasks."app:install"]
+description = "Build release and install it into /Applications, then open it"
+run = """
+set -e
+DEST="${INSTALL_DIR:-/Applications}/Herdview.app"
+[ -d "$(dirname "$DEST")" ] || { echo "no such directory: $(dirname "$DEST")" >&2; exit 1; }
+./scripts/build-app.sh release
+mise run app:quit
+rm -rf "$DEST"
+ditto build/Herdview.app "$DEST"
+echo "installed: $DEST"
+open "$DEST"
+"""
 
 [tasks.test]
 description = "Run the unit tests"
