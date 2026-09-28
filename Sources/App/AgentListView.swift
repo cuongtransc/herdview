@@ -362,6 +362,10 @@ private struct AgentRow: View {
         // before the status pill is still a double-click on this Agent.
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onJump)
+        // The window is almost always the inactive one — a Jump itself puts
+        // cmux in front — and AppKit spends the first click on an inactive
+        // window on activating it. A click on a row is meant for the row.
+        .jumpsOnFirstClick()
         .onHover { isHovering = $0 }
         .help(tooltip(for: text))
     }
@@ -661,5 +665,19 @@ struct Notice: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
+    }
+}
+
+private extension View {
+    /// Lets the first click on an inactive window reach this view's gestures
+    /// and buttons. Before macOS 15 there is no way to, and the click only
+    /// activates the window, as it always did.
+    @ViewBuilder
+    func jumpsOnFirstClick() -> some View {
+        if #available(macOS 15.0, *) {
+            allowsWindowActivationEvents(true)
+        } else {
+            self
+        }
     }
 }

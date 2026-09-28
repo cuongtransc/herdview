@@ -119,6 +119,7 @@ enum UIShots {
             controller.filterState.clear()
 
             await checkFilterBarWidths()
+            await checkJumpFromInactiveWindow()
 
             let report = lines.joined(separator: "\n") + "\n"
             try? report.write(to: directory.appendingPathComponent("results.txt"), atomically: true, encoding: .utf8)
@@ -202,12 +203,55 @@ enum UIShots {
         }
 
         private func click(_ point: NSPoint) async {
-            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                                                     timestamp: ProcessInfo.processInfo.systemUptime,
-                                                     windowNumber: window.windowNumber, context: nil,
-                                                     eventNumber: 0, clickCount: 1, pressure: 1) else { continue }
-                window.sendEvent(event)
+            send(.leftMouseDown, at: point, count: 1)
+            send(.leftMouseUp, at: point, count: 1)
+            await pause()
+        }
+
+        private var jumps = 0
+
+        /// A double-click on a row Jumps while the window is not the key one —
+        /// which is how it almost always is, since a Jump puts cmux in front.
+        /// AppKit spent that first click on activating the window, and a Jump
+        /// took two tries (2026-09-28). The run never activates the app, so the
+        /// window here is not key, as for the person.
+        private func checkJumpFromInactiveWindow() async {
+            store.canJump = true
+            store.jumpAction = { [weak self] _ in self?.jumps += 1 }
+            defer {
+                store.jumpAction = nil
+                store.canJump = false
+            }
+            await state(size: UIShots.wide, dark: false, expanded: false)
+            await pause()
+            guard !window.isKeyWindow else {
+                fail("first-click Jump: the window is key, so the check would prove nothing")
+                return
+            }
+            // Down the column of names until a double-click lands on a row.
+            let height = window.contentView?.bounds.height ?? 0
+            var landed: NSPoint?
+            for y in stride(from: height - 60, to: 40, by: -10) where landed == nil {
+                let point = NSPoint(x: 90, y: y)
+                await doubleClick(point)
+                if jumps > 0 { landed = point }
+            }
+            check("a double-click on a row of the inactive window Jumps (\(jumps) Jumps)",
+                  landed != nil && jumps == 1)
+        }
+
+        private func send(_ type: NSEvent.EventType, at point: NSPoint, count: Int) {
+            guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil,
+                                                 eventNumber: 0, clickCount: count, pressure: 1) else { return }
+            window.sendEvent(event)
+        }
+
+        private func doubleClick(_ point: NSPoint) async {
+            for count in [1, 2] {
+                send(.leftMouseDown, at: point, count: count)
+                send(.leftMouseUp, at: point, count: count)
             }
             await pause()
         }
