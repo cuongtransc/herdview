@@ -379,9 +379,12 @@ private struct AgentRow: View {
     /// surface, not with a web link's rule.
     /// A `Button` rather than a tap gesture, so the row's double-click does not
     /// hold the click back while it waits to see whether a second one follows.
+    /// The button is there whenever a Jump can happen, not only on hover: an
+    /// inactive window gets no hover, and the click that activates it would
+    /// otherwise find no button yet.
     private func titleLine(_ text: AgentRowText) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            if titleIsLink {
+            if canJump {
                 Button(action: onJump) {
                     titleText(text)
                 }

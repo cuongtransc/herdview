@@ -228,16 +228,24 @@ enum UIShots {
                 fail("first-click Jump: the window is key, so the check would prove nothing")
                 return
             }
-            // Down the column of names until a double-click lands on a row.
+            // A single click on a title, with no hover first: an inactive
+            // window gets no hover, so the title is not a link yet (2026-09-28).
+            var landed = await firstJump { await self.click($0) }
+            check("a click on a title of the inactive window Jumps (\(jumps) Jumps)", landed != nil && jumps == 1)
+            jumps = 0
+            landed = await firstJump { await self.doubleClick($0) }
+            check("a double-click on a row of the inactive window Jumps (\(jumps) Jumps)", landed != nil && jumps == 1)
+        }
+
+        /// Down the column of names, `act` at each point until one Jumps.
+        private func firstJump(_ act: (NSPoint) async -> Void) async -> NSPoint? {
             let height = window.contentView?.bounds.height ?? 0
-            var landed: NSPoint?
-            for y in stride(from: height - 60, to: 40, by: -10) where landed == nil {
+            for y in stride(from: height - 60, to: 40, by: -10) {
                 let point = NSPoint(x: 90, y: y)
-                await doubleClick(point)
-                if jumps > 0 { landed = point }
+                await act(point)
+                if jumps > 0 { return point }
             }
-            check("a double-click on a row of the inactive window Jumps (\(jumps) Jumps)",
-                  landed != nil && jumps == 1)
+            return nil
         }
 
         private func send(_ type: NSEvent.EventType, at point: NSPoint, count: Int) {
