@@ -362,6 +362,10 @@ private struct AgentRow: View {
         // before the status pill is still a double-click on this Agent.
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onJump)
+        // The window is almost always the inactive one — a Jump itself puts
+        // cmux in front — and AppKit spends the first click on an inactive
+        // window on activating it. A click on a row is meant for the row.
+        .jumpsOnFirstClick()
         .onHover { isHovering = $0 }
         .help(tooltip(for: text))
     }
@@ -375,9 +379,12 @@ private struct AgentRow: View {
     /// surface, not with a web link's rule.
     /// A `Button` rather than a tap gesture, so the row's double-click does not
     /// hold the click back while it waits to see whether a second one follows.
+    /// The button is there whenever a Jump can happen, not only on hover: an
+    /// inactive window gets no hover, and the click that activates it would
+    /// otherwise find no button yet.
     private func titleLine(_ text: AgentRowText) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            if titleIsLink {
+            if canJump {
                 Button(action: onJump) {
                     titleText(text)
                 }
@@ -661,5 +668,19 @@ struct Notice: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
+    }
+}
+
+private extension View {
+    /// Lets the first click on an inactive window reach this view's gestures
+    /// and buttons. Before macOS 15 there is no way to, and the click only
+    /// activates the window, as it always did.
+    @ViewBuilder
+    func jumpsOnFirstClick() -> some View {
+        if #available(macOS 15.0, *) {
+            allowsWindowActivationEvents(true)
+        } else {
+            self
+        }
     }
 }
