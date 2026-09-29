@@ -10,12 +10,13 @@ public enum QuotaFormat {
     }
 
     /// Time left until a Reset: `4d2h`, `4d`, `1d5h`, `1h36m`, `5h`, `36m`, `<1m`.
-    /// A Reset already past reads `reset pending` until the next fetch brings
-    /// the new Window; `nil` when the Provider gave no Reset.
+    /// A Reset already past reads `now` until the next fetch brings the new
+    /// Window — short, because the row's column is sized for `23h59m`; `nil`
+    /// when the Provider gave no Reset.
     public static func untilReset(_ reset: Date?, now: Date) -> String? {
         guard let reset else { return nil }
         let seconds = Int(reset.timeIntervalSince(now))
-        if seconds <= 0 { return "reset pending" }
+        if seconds <= 0 { return "now" }
         let days = seconds / 86_400
         let hours = (seconds % 86_400) / 3_600
         let minutes = (seconds % 3_600) / 60

@@ -176,7 +176,7 @@ enum UIShots {
         /// `11h31m` (44.15 pt) was cut to `11h31…` (2026-09-29).
         private func checkResetColumn() {
             let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-            let widest = ["23h59m", "99d23h"].map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+            let widest = ["23h59m", "99d23h", QuotaFormat.untilReset(.distantPast, now: .now) ?? ""].map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
             check("time to Reset fits its column (\(widest) pt in \(WindowLine.resetWidth) pt)",
                   widest <= WindowLine.resetWidth)
         }
