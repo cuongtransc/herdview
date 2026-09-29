@@ -24,11 +24,16 @@ struct FilterBar: View {
             searchField
             // A segmented control does not shrink: given less room than its
             // labels need, it runs past the window's edge and the last segment
-            // is cut off. So it steps down until it fits — full size, then
-            // small, then small with the short labels — and the counts, which
-            // are the point, survive every step.
+            // is cut off. So it steps down until it fits — small, then small
+            // with the short labels — and the counts, which are the point,
+            // survive every step.
+            //
+            // No `.regular` step. `ViewThatFits` measured it at 386 pt before
+            // it was in the window and AppKit sized it at 388 pt once it was,
+            // so with 387 pt of room it fitted, then did not, then did, and
+            // AppKit threw on the loop (2026-09-25 and 2026-09-29). The small
+            // sizes measure the same both ways.
             ViewThatFits(in: .horizontal) {
-                scopePicker(short: false).controlSize(.regular)
                 scopePicker(short: false).controlSize(.small)
                 scopePicker(short: true).controlSize(.small)
             }
