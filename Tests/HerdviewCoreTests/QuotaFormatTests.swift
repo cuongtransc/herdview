@@ -26,9 +26,11 @@ final class QuotaFormatTests: XCTestCase {
         XCTAssertEqual(until(59), "<1m")
     }
 
-    func testAResetInThePastIsPending() {
-        XCTAssertEqual(until(0), "reset pending")
-        XCTAssertEqual(until(-600), "reset pending")
+    /// Short enough for the row's time-to-Reset column, which cut
+    /// `reset pending` to `reset…`.
+    func testAResetInThePastIsNow() {
+        XCTAssertEqual(until(0), "now")
+        XCTAssertEqual(until(-600), "now")
     }
 
     func testNoResetHasNoText() {
