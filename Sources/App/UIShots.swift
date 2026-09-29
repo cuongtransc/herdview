@@ -118,6 +118,8 @@ enum UIShots {
             await shoot("06-filter-hides-attention")
             controller.filterState.clear()
 
+            checkResetColumn()
+            await checkQuotaExpandedDrag()
             await checkFilterBarWidths()
             await checkJumpFromInactiveWindow()
 
@@ -168,6 +170,42 @@ enum UIShots {
             store.removeSession(host: "local", session: "sweep")
             check("status segments stay inside the window (overflow at: \(overflows.joined(separator: ", ")))",
                   overflows.isEmpty)
+        }
+
+        /// The time to Reset at its widest, `23h59m`, fits its column: at 44 pt
+        /// `11h31m` (44.15 pt) was cut to `11h31…` (2026-09-29).
+        private func checkResetColumn() {
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            let widest = ["23h59m", "99d23h"].map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+            check("time to Reset fits its column (\(widest) pt in \(WindowLine.resetWidth) pt)",
+                  widest <= WindowLine.resetWidth)
+        }
+
+        /// A window dragged narrower one point at a time with the Quota
+        /// expanded, under both scroller styles. The status segments traded
+        /// sizes forever at one width here and AppKit threw (2026-09-29): a
+        /// crash, so this step fails by never returning.
+        private func checkQuotaExpandedDrag() async {
+            for height: CGFloat in [410, 440, 480] {
+                for style in [NSScroller.Style.legacy, .overlay] {
+                    await state(size: NSSize(width: 470, height: height), dark: false, expanded: true)
+                    scrollView(in: window.contentView)?.scrollerStyle = style
+                    var width: CGFloat = 470
+                    while width >= 360 {
+                        window.setContentSize(NSSize(width: width, height: height))
+                        try? await Task.sleep(nanoseconds: 30_000_000)
+                        width -= 1
+                    }
+                }
+            }
+            check("dragging narrower with the Quota expanded settles", true)
+        }
+
+        private func scrollView(in view: NSView?) -> NSScrollView? {
+            guard let view else { return nil }
+            if let scroll = view as? NSScrollView { return scroll }
+            for sub in view.subviews { if let found = scrollView(in: sub) { return found } }
+            return nil
         }
 
         private func state(size: NSSize, dark: Bool, expanded: Bool) async {

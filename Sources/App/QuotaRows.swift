@@ -131,7 +131,9 @@ struct WindowLine: View {
     /// a full Window is a warning (at `warningPercent`), so the column takes
     /// the semibold width. Truncation, never wrapping, if a wider value comes.
     private static let percentWidth: CGFloat = 33
-    private static let resetWidth: CGFloat = 44
+    /// Wide enough for `23h59m`, the widest time to Reset: 44.15 pt at this
+    /// font, so 44 cut `11h31m` to `11h31…`.
+    static let resetWidth: CGFloat = 45
 
     let window: QuotaWindow
     let now: Date
