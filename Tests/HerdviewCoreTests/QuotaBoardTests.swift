@@ -32,9 +32,9 @@ final class QuotaBoardTests: XCTestCase {
         var board = QuotaBoard(providers: [.opencodeGo, .grok])
         board.setAccounts([account(.opencodeGo, "a", [.opencode]), account(.opencodeGo, "b", [.pi])], for: .opencodeGo)
         board.setProviderEntry(.notSignedIn, for: .grok)
-        XCTAssertEqual(board.rows.map(\.title), ["OpenCode Go · opencode", "OpenCode Go · pi", "Grok"])
-        XCTAssertEqual(board.rows.map(\.entry), [.loading, .loading, .notSignedIn])
-        XCTAssertEqual(Set(board.rows.map(\.id)).count, 3)
+        XCTAssertEqual(board.rows.map(\.title), ["OpenCode Go · opencode", "OpenCode Go · pi"])
+        XCTAssertEqual(board.rows.map(\.entry), [.loading, .loading])
+        XCTAssertEqual(Set(board.rows.map(\.id)).count, 2)
     }
 
     /// Re-reading the same Accounts must not throw away their numbers.
@@ -63,19 +63,27 @@ final class QuotaBoardTests: XCTestCase {
         XCTAssertEqual(board.entry(for: old.key), .loading)
     }
 
-    func testNoAccountLeftShowsTheProviderEntry() {
+    /// A Provider no Source is signed in to has nothing to show, so it has no row.
+    func testNoAccountLeftLeavesNoRow() {
         var board = QuotaBoard(providers: [.claude])
         let claude = account(.claude, "h", [.claude])
         board.setAccounts([claude], for: .claude)
         board.set(report(.claude, 10), for: claude.key)
         board.setProviderEntry(.notSignedIn, for: .claude)
-        XCTAssertEqual(board.rows.map(\.entry), [.notSignedIn])
+        XCTAssertEqual(board.rows, [])
         XCTAssertEqual(board.accounts(of: .claude), [])
         XCTAssertEqual(board.entry(for: claude.key), .loading)
     }
 
+    /// A Source that could not be read is not "not signed in": the row stays to say so.
+    func testAProviderThatFailedKeepsItsRow() {
+        var board = QuotaBoard(providers: [.codex])
+        board.setProviderEntry(.problem(.failed("unreadable"), last: nil), for: .codex)
+        XCTAssertEqual(board.rows.map(\.entry), [.problem(.failed("unreadable"), last: nil)])
+    }
+
     func testTheFixtureShowsTwoOpenCodeAccounts() {
         let titles = UIShotFixtures.quota(now: now).rows.map(\.title)
-        XCTAssertEqual(titles, ["Claude", "Codex", "OpenCode Go · opencode", "OpenCode Go · pi", "Grok"])
+        XCTAssertEqual(titles, ["Claude", "OpenCode Go · opencode", "OpenCode Go · pi", "Grok"])
     }
 }

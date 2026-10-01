@@ -114,8 +114,8 @@ public enum ConfigLoader {
         """
         # Herdview — the machines running Herdr that the window watches.
         #
-        # Providers the Quota card should leave out, so a row you have no
-        # account for is not a row that can only say "not signed in". Any of:
+        # Providers the Quota card should leave out even though you are signed
+        # in to them; one you are not signed in to has no row anyway. Any of:
         # claude, codex, opencodeGo, grok. Keep this above the first [[hosts]].
         # hidden_providers = ["codex"]
         #
