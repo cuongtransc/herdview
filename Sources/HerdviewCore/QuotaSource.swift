@@ -15,7 +15,7 @@ public enum QuotaSource: String, CaseIterable, Sendable {
     public static func sources(for provider: QuotaProvider) -> [QuotaSource] {
         switch provider {
         case .claude: return [.claude]
-        case .codex: return [.codex]
+        case .codex: return [.codex, .pi]
         case .opencodeGo: return [.opencode, .pi]
         case .grok: return [.grok, .pi]
         }

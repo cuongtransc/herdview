@@ -19,15 +19,15 @@ final class UIShotFixturesTests: XCTestCase {
         XCTAssertEqual(keys.count, Set(keys).count)
     }
 
-    func testEveryProviderHasAnEntry() {
-        XCTAssertEqual(Set(UIShotFixtures.quota(now: now).rows.map(\.provider)), Set(QuotaProvider.allCases))
+    /// Codex is not signed in in the fixture, so it is the one Provider without a row.
+    func testEveryProviderButTheOneNotSignedInHasARow() {
+        XCTAssertEqual(Set(UIShotFixtures.quota(now: now).rows.map(\.provider)), Set(QuotaProvider.allCases).subtracting([.codex]))
     }
 
-    func testTheQuotaShowsFreshStaleAndMissingNumbers() {
+    func testTheQuotaShowsFreshAndStaleNumbers() {
         let entries = UIShotFixtures.quota(now: now).rows.map(\.entry)
         XCTAssertTrue(entries.contains { if case .ok = $0 { return true }; return false })
         XCTAssertTrue(entries.contains { if case .problem(_, let last?) = $0 { return !last.windows.isEmpty }; return false })
-        XCTAssertTrue(entries.contains { $0 == .notSignedIn })
     }
 
     func testSomeProviderHasAPerModelWeekBesideItsPlainWeek() {

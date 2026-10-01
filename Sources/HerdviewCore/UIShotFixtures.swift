@@ -26,9 +26,9 @@ public enum UIShotFixtures {
         ]
     }
 
-    /// Every Quota state the panel draws: fresh, not signed in, two Accounts of
-    /// one Provider (one of them spent), and one quiet Account held by two
-    /// Sources.
+    /// Every Quota state the panel draws: fresh, two Accounts of one Provider
+    /// (one of them spent), and one quiet Account held by two Sources. Codex is
+    /// not signed in, so it draws no row.
     public static func quota(now: Date) -> QuotaBoard {
         let hour: TimeInterval = 3_600
         let fiveHours = 5 * hour

@@ -55,13 +55,16 @@ public struct QuotaBoard: Equatable, Sendable {
 
     /// Provider order, then Account order. A Provider with one Account reads
     /// exactly as it did before Accounts existed; only several need telling
-    /// apart, and their Sources are the one thing safe to show.
+    /// apart, and their Sources are the one thing safe to show. A Provider no
+    /// Source is signed in to has no row: there is nothing of it to show.
     public var rows: [QuotaRowModel] {
         providers.flatMap { provider -> [QuotaRowModel] in
             let found = accounts(of: provider)
             guard !found.isEmpty else {
+                let entry = providerEntries[provider] ?? .loading
+                guard entry != .notSignedIn else { return [] }
                 return [QuotaRowModel(id: provider.rawValue, provider: provider, title: provider.displayName,
-                                      entry: providerEntries[provider] ?? .loading)]
+                                      entry: entry)]
             }
             return found.map { account in
                 let title = found.count == 1

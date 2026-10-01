@@ -118,8 +118,8 @@ Beside the traffic lights in the window's title bar, a Quota strip shows how
 much of each plan is used. Collapsed — the default — it holds one item per
 Provider, minus anything in `hidden_providers`: the Provider's icon, its
 shortest Window, and its `week`, each as a mini bar, with its percent when
-there is room. A Provider with no numbers — still loading, not signed in, or
-a problem with no last report — shows just its icon. A hidden Provider is not
+there is room. A Provider with no numbers — still loading, or a problem with
+no last report — shows just its icon. A hidden Provider is not
 fetched either, so its credential file is not even read.
 Clicking the strip expands it in place, pushing the filter and list down. Every
 Window — `5h`, `week`, `month`, or a per-model week like `week · Fable` — shows
@@ -137,7 +137,7 @@ never from the remote hosts, since every host spends the same accounts:
 | Provider | Credential read |
 |---|---|
 | Claude | Keychain item `Claude Code-credentials` |
-| Codex | `~/.codex/auth.json` |
+| Codex | `~/.codex/auth.json`, and `openai-codex` in pi's `~/.pi/agent/auth.json` |
 | OpenCode Go | `opencode-go` key in `~/.local/share/opencode/auth.json`, and in pi's `~/.pi/agent/auth.json` |
 | Grok | `~/.grok/auth.json`, and `xai` in pi's `~/.pi/agent/auth.json` |
 
@@ -149,7 +149,7 @@ each gets its own row, named by the tools that hold it — `OpenCode Go · pi`
 ([ADR 0006](docs/adr/0006-quota-per-account-from-every-source.md)).
 An account no tool has used for a few hours shows its last numbers dimmed with
 "quiet · updated 3h ago": its Quota has not moved, and the next tool to run
-brings fresh numbers. A Provider no tool is signed in to shows "not signed in". Quota
+brings fresh numbers. A Provider no tool is signed in to has no row. Quota
 is fetched every 5 minutes, and when the window is shown, but only while the
 window is visible; the ↻ button in the expanded strip's header fetches it at
 once, unless an account is waiting out a rate limit. The first read of

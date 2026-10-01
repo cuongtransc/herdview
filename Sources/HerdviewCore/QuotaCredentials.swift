@@ -65,7 +65,11 @@ public enum QuotaCredentials {
                   entry["type"] as? String == "oauth",
                   let token = entry["access"] as? String else { return nil }
             return credential(token: token, accountId: JWTClaims.subject(of: token))
-        case .claude, .codex:
+        case .codex:
+            guard let entry = json["openai-codex"] as? [String: Any],
+                  entry["type"] as? String == "oauth" else { return nil }
+            return credential(token: entry["access"], accountId: entry["accountId"])
+        case .claude:
             return nil
         }
     }
