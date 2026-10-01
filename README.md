@@ -137,7 +137,7 @@ never from the remote hosts, since every host spends the same accounts:
 | Provider | Credential read |
 |---|---|
 | Claude | Keychain item `Claude Code-credentials` |
-| Codex | `~/.codex/auth.json` |
+| Codex | `~/.codex/auth.json`, and `openai-codex` in pi's `~/.pi/agent/auth.json` |
 | OpenCode Go | `opencode-go` key in `~/.local/share/opencode/auth.json`, and in pi's `~/.pi/agent/auth.json` |
 | Grok | `~/.grok/auth.json`, and `xai` in pi's `~/.pi/agent/auth.json` |
 

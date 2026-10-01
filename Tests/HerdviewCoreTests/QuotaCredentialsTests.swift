@@ -62,7 +62,7 @@ final class QuotaCredentialsTests: XCTestCase {
 
     func testSourcesPerProviderOwnCLIFirst() {
         XCTAssertEqual(QuotaSource.sources(for: .claude), [.claude])
-        XCTAssertEqual(QuotaSource.sources(for: .codex), [.codex])
+        XCTAssertEqual(QuotaSource.sources(for: .codex), [.codex, .pi])
         XCTAssertEqual(QuotaSource.sources(for: .opencodeGo), [.opencode, .pi])
         XCTAssertEqual(QuotaSource.sources(for: .grok), [.grok, .pi])
     }
@@ -96,8 +96,20 @@ final class QuotaCredentialsTests: XCTestCase {
         XCTAssertNil(QuotaCredentials.parse(.grok, from: .pi, Data(#"{"xai":{"type":"oauth","access":""}}"#.utf8)))
     }
 
-    /// pi is not a Source for Claude or Codex, whatever its file holds.
-    func testPiHoldsNoClaudeOrCodex() {
+    /// pi keeps Codex as `openai-codex`, its account id beside the token.
+    func testPiCodexTokenAndAccountId() {
+        let json = Data(#"{"openai-codex":{"type":"oauth","access":"cx","refresh":"r","expires":1791683291103,"accountId":"acct-1"}}"#.utf8)
+        XCTAssertEqual(QuotaCredentials.parse(.codex, from: .pi, json), QuotaCredential(token: "cx", accountId: "acct-1"))
+    }
+
+    func testPiCodexWithoutAnOAuthTokenHasNothing() {
+        XCTAssertNil(QuotaCredentials.parse(.codex, from: .pi, Data(#"{"openai-codex":{"type":"api_key","access":"cx"}}"#.utf8)))
+        XCTAssertNil(QuotaCredentials.parse(.codex, from: .pi, Data(#"{"openai-codex":{"type":"oauth","access":""}}"#.utf8)))
+        XCTAssertNil(QuotaCredentials.parse(.codex, from: .pi, Data(#"{"openai-codex":{"type":"oauth"}}"#.utf8)))
+    }
+
+    /// pi is not a Source for Claude, and keeps Codex only under its own key.
+    func testPiHoldsNoClaudeAndNoCodexInCodexsFormat() {
         let json = Data(#"{"claudeAiOauth":{"accessToken":"t"},"tokens":{"access_token":"t"}}"#.utf8)
         XCTAssertNil(QuotaCredentials.parse(.claude, from: .pi, json))
         XCTAssertNil(QuotaCredentials.parse(.codex, from: .pi, json))
