@@ -84,8 +84,11 @@ final class MainWindowController: NSObject {
         // user's window opens at next time.
         if !autosavesFrame {
             window.center()
-        } else if !window.setFrameUsingName(Self.frameAutosaveName) {
-            window.center()
+        } else {
+            Self.untileSavedFrame()
+            if !window.setFrameUsingName(Self.frameAutosaveName) {
+                window.center()
+            }
         }
         if autosavesFrame {
             _ = window.setFrameAutosaveName(Self.frameAutosaveName)
@@ -103,6 +106,16 @@ final class MainWindowController: NSObject {
 
         findItem?.target = self
         findItem?.action = #selector(find)
+    }
+
+    /// A window saved while macOS had it tiled — dragged into the screen's top
+    /// edge, say — opens tiled again, and then fills the screen after every
+    /// Mission Control. It opens at its own size instead.
+    private static func untileSavedFrame() {
+        let key = "NSWindow Frame \(frameAutosaveName)"
+        guard let saved = UserDefaults.standard.string(forKey: key),
+              let untiled = SavedWindowFrame.untiled(saved) else { return }
+        UserDefaults.standard.set(untiled, forKey: key)
     }
 
     var isVisible: Bool { window.isVisible && !window.isMiniaturized }
